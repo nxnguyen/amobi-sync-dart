@@ -12,7 +12,8 @@ Upstream repository: https://github.com/powersync-ja/powersync.dart
 
 Maintained Amobi repository:
 `https://github.com/nxnguyen/amobi-sync-dart`, tag
-`amobi-1.18.0-core1.8.0.1`, commit `ccff25541a0e95d4db7f72d5d062ebf37e7491e5`.
+`amobi-1.18.0-core1.8.0.2`. The exact commit is recorded in
+`clients/GITHUB_FORKS.json` in the maintained server repository.
 Git package paths are `packages/powersync` and `packages/powersync_core`;
 the maintained local mirrors remain `clients/flutter_1_18` and its `core/`.
 Package repository metadata points here; upstream attribution stays above.
@@ -31,8 +32,10 @@ entries and 6 MiB. Each chunk has its own durable UUID/body and advances only
 after an exact ACK; the SDK head retires after the last chunk. Server atomicity
 is per HTTP request. Existing `.1` frozen requests retain their original key and
 bytes; an old oversized frozen request stays held for reconciliation. The old
-`.1` journal refuses a new partial-head record before HTTP. The stable published
-revision above remains `.1` until the `.2` Git candidate passes acceptance.
+`.1` journal refuses a new partial-head record before HTTP. The `.2` Git candidate passed real Rust HTTP acceptance, including a 103-entry
+SDK transaction, a lost ACK, exact replay after reopen, and a fresh reader.
+A separate `.1`-pinned package verified that both pending chunk states remain
+held with unchanged key/body/queue and zero HTTP after downgrade.
 
 The same-file test proves an upstream 1.18.0 client can reopen a file containing
 the fork's pending metadata without deleting it. It does not authorize upstream
