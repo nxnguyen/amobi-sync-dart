@@ -7,7 +7,7 @@ import 'dart:io';
 
 import 'package:async/async.dart';
 import 'package:http/http.dart';
-import 'package:powersync_core/src/sync/stream_utils.dart';
+import 'package:amobi_sync_core/src/sync/stream_utils.dart';
 import 'package:test/test.dart';
 
 void main() {

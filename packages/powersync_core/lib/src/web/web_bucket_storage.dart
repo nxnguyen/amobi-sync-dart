@@ -1,5 +1,5 @@
-import 'package:powersync_core/sqlite_async.dart';
-import 'package:powersync_core/src/sync/bucket_storage.dart';
+import 'package:amobi_sync_core/sqlite_async.dart';
+import 'package:amobi_sync_core/src/sync/bucket_storage.dart';
 import 'package:sqlite_async/web.dart';
 
 class WebBucketStorage extends BucketStorage {

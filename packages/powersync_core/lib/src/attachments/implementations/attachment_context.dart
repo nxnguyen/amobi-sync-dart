@@ -1,5 +1,5 @@
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/sqlite3_common.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/sqlite3_common.dart';
 import 'package:logging/logging.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 import 'package:meta/meta.dart';

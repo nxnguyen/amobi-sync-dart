@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:powersync/powersync.dart';
+import 'package:amobi_sync_flutter/powersync.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
 

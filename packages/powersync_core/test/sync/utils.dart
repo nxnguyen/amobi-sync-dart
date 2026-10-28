@@ -1,5 +1,5 @@
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/src/sync/protocol.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/src/sync/protocol.dart';
 import 'package:test/test.dart';
 
 TypeMatcher<SyncStatus> isSyncStatus({

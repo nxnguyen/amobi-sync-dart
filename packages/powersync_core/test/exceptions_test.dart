@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart';
-import 'package:powersync_core/src/exceptions.dart';
+import 'package:amobi_sync_core/src/exceptions.dart';
 import 'package:test/test.dart';
 
 void main() {

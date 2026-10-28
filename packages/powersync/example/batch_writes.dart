@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:powersync/powersync.dart';
+import 'package:amobi_sync_flutter/powersync.dart';
 
 late PowerSyncDatabase db;
 

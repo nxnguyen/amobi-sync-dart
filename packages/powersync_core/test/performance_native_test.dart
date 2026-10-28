@@ -1,7 +1,7 @@
 @TestOn('!browser')
 library;
 
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:test/test.dart';
 
 import 'performance_shared_test.dart';

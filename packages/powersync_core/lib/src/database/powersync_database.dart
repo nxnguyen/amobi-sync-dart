@@ -1,7 +1,7 @@
 import 'package:logging/logging.dart';
-import 'package:powersync_core/src/database/powersync_database_impl.dart';
-import 'package:powersync_core/src/database/powersync_db_mixin.dart';
-import 'package:powersync_core/src/open_factory/abstract_powersync_open_factory.dart';
+import 'package:amobi_sync_core/src/database/powersync_database_impl.dart';
+import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
+import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
 import '../schema.dart';

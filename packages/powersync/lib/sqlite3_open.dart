@@ -2,4 +2,4 @@
 /// adding it as a direct dependency.
 library;
 
-export 'package:powersync_core/sqlite3_open.dart';
+export 'package:amobi_sync_core/sqlite3_open.dart';

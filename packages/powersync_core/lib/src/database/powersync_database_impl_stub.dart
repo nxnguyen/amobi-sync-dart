@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
-import 'package:powersync_core/sqlite_async.dart';
-import 'package:powersync_core/src/abort_controller.dart';
-import 'package:powersync_core/src/database/powersync_db_mixin.dart';
-import 'package:powersync_core/src/open_factory/abstract_powersync_open_factory.dart';
+import 'package:amobi_sync_core/sqlite_async.dart';
+import 'package:amobi_sync_core/src/abort_controller.dart';
+import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
+import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
 import '../sync/options.dart';
 import '../sync/streaming_sync.dart';
 import 'powersync_database.dart';

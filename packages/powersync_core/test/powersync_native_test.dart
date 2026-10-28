@@ -4,7 +4,7 @@ library;
 import 'dart:async';
 import 'dart:math';
 
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:test/test.dart';
 import 'utils/abstract_test_utils.dart';

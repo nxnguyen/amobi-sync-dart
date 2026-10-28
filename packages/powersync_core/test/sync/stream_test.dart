@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:async/async.dart';
 import 'package:logging/logging.dart';
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:test/test.dart';
 
 import '../server/sync_server/in_memory_sync_server.dart';

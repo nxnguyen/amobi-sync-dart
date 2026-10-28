@@ -1,7 +1,7 @@
-name: powersync_core
-version: 1.8.0
+name: amobi_sync_core
+version: 1.8.0+amobi.1
 homepage: https://powersync.com
-repository: https://github.com/powersync-ja/powersync.dart
+repository: https://github.com/nxnguyen/amobi-sync-dart
 description: PowerSync Dart SDK - sync engine for building local-first apps.
 
 environment:

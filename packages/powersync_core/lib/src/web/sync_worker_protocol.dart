@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:logging/logging.dart';
-import 'package:powersync_core/src/schema.dart';
-import 'package:powersync_core/src/sync/options.dart';
-import 'package:powersync_core/src/sync/stream.dart';
+import 'package:amobi_sync_core/src/schema.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/src/sync/stream.dart';
 import 'package:web/web.dart';
 
 import '../connector.dart';

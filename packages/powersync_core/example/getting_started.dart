@@ -2,11 +2,11 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:path/path.dart';
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/sqlite3.dart' as sqlite;
-import 'package:powersync_core/sqlite3_common.dart';
-import 'package:powersync_core/sqlite3_open.dart' as sqlite_open;
-import 'package:powersync_core/sqlite_async.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/sqlite3.dart' as sqlite;
+import 'package:amobi_sync_core/sqlite3_common.dart';
+import 'package:amobi_sync_core/sqlite3_open.dart' as sqlite_open;
+import 'package:amobi_sync_core/sqlite_async.dart';
 
 const schema = Schema([
   Table('customers', [Column.text('name'), Column.text('email')])

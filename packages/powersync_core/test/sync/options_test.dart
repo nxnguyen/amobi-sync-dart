@@ -1,4 +1,4 @@
-import 'package:powersync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
 import 'package:test/test.dart';
 
 void main() {

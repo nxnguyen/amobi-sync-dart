@@ -107,12 +107,13 @@ Future<void> downloadWebAssets(List<String> arguments,
 
 Future<({String tag, Version version})> powerSyncVersionOrLatest(
     HttpClient client, dynamic packageConfig, File packageConfigFile) async {
-  const powersyncPackageName = 'powersync';
+  const powersyncPackageName = 'amobi_sync_flutter';
   // Don't require powersync dependency. The user has one if running this script
   // and we also want to support powersync_sqlcipher (for which we download
   // the latest versions).
   final powersyncPkg = getPackageFromConfig(packageConfig, powersyncPackageName,
-      required: false);
+          required: false) ??
+      getPackageFromConfig(packageConfig, 'powersync', required: false);
   if (powersyncPkg == null) {
     final [tag, ...] =
         await getLatestTagsFromRelease(client, repo: 'powersync.dart');
@@ -123,8 +124,9 @@ Future<({String tag, Version version})> powerSyncVersionOrLatest(
     );
   }
 
-  final powersyncVersion =
-      getPubspecVersion(packageConfigFile, powersyncPkg, powersyncPackageName);
+  final powersyncVersion = getPubspecVersion(
+          packageConfigFile, powersyncPkg, powersyncPkg['name'] as String)
+      .split('+').first;
   return (
     tag: 'powersync-v$powersyncVersion',
     version: Version.parse(powersyncVersion),

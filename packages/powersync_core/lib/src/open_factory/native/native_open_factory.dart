@@ -3,9 +3,9 @@ import 'dart:io' as io;
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:powersync_core/src/exceptions.dart';
-import 'package:powersync_core/src/log.dart';
-import 'package:powersync_core/src/open_factory/abstract_powersync_open_factory.dart';
+import 'package:amobi_sync_core/src/exceptions.dart';
+import 'package:amobi_sync_core/src/log.dart';
+import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
 import 'package:sqlite_async/sqlite3.dart' as sqlite;
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:sqlite_async/sqlite_async.dart';

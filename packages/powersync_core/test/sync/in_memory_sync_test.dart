@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:async/async.dart';
 import 'package:logging/logging.dart';
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/sqlite3_common.dart';
-import 'package:powersync_core/src/sync/protocol.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/sqlite3_common.dart';
+import 'package:amobi_sync_core/src/sync/protocol.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:test/test.dart';
