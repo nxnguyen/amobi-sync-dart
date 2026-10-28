@@ -17,6 +17,8 @@ const _maxEntries = 5000;
 const _maxBatchEntries = 100;
 const int _maxBodyBytes = 6 * 1024 * 1024;
 const int _maxHeadBytes = 16 * 1024 * 1024;
+// At most 16 MiB raw SDK head plus 8 MiB for per-entry owner/envelope fields.
+const int _maxPlannedBytes = _maxHeadBytes + 8 * 1024 * 1024;
 final _uploadKeyPattern = RegExp(
   r"^amobi-ezai-upload-v1-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
 );
@@ -173,6 +175,7 @@ final class AmobiUploadJournal {
     current();
     var pending = await _pending();
     var transaction = await database.getNextCrudTransaction();
+    List<({List<int> bytes, int count})>? plannedRemaining;
     current();
     if (pending == null && transaction == null) return false;
 
@@ -181,9 +184,11 @@ final class AmobiUploadJournal {
       if (transaction.crud.isEmpty || transaction.crud.length > _maxEntries) {
         throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
       }
-      final firstChunk = _freezeChunk(transaction.crud, 0, buildBody);
       final head = await _rawHead(transaction);
       if (head == null) throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
+      final planned = _planChunks(transaction.crud, 0, buildBody);
+      final firstChunk = planned.first;
+      plannedRemaining = planned.sublist(1);
       current();
       final key = "$amobiUploadProtocol-${const Uuid().v4()}";
       await database.writeTransaction((tx) async {
@@ -221,6 +226,9 @@ final class AmobiUploadJournal {
         pending.chunkOffset + pending.entryCount > transaction.crud.length) {
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
     }
+    plannedRemaining ??= _planChunks(transaction.crud, pending.chunkOffset + pending.entryCount, buildBody);
+    var plannedPosition = 0;
+    current();
     var active = pending;
     for (var chunk = 0; chunk < _maxEntries; chunk++) {
       if (!active.acknowledged) {
@@ -260,7 +268,7 @@ final class AmobiUploadJournal {
         await database.execute("DELETE FROM $_pendingTable WHERE singleton=1 AND upload_key=?", [active.key]);
         return true;
       }
-      final nextChunk = _freezeChunk(transaction.crud, nextOffset, buildBody);
+      final nextChunk = plannedRemaining[plannedPosition++];
       final nextKey = "$amobiUploadProtocol-${const Uuid().v4()}";
       await database.writeTransaction((tx) async {
         current();
@@ -400,6 +408,23 @@ final class AmobiUploadJournal {
       }
     }
     return (bytes: best, count: low);
+  }
+
+  List<({List<int> bytes, int count})> _planChunks(
+    List<CrudEntry> entries,
+    int offset,
+    String Function(List<CrudEntry>) buildBody,
+  ) {
+    final chunks = <({List<int> bytes, int count})>[];
+    var totalBytes = 0;
+    while (offset < entries.length) {
+      final chunk = _freezeChunk(entries, offset, buildBody);
+      totalBytes += chunk.bytes.length;
+      if (totalBytes > _maxPlannedBytes) throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
+      chunks.add(chunk);
+      offset += chunk.count;
+    }
+    return chunks;
   }
 
   Future<String?> _rawHead(CrudTransaction transaction, {SqliteWriteContext? tx}) async {

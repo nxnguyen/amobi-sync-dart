@@ -1,5 +1,5 @@
 name: amobi_sync_flutter
-version: 1.18.0+amobi.2
+version: 1.18.0+amobi.3
 homepage: https://powersync.com
 repository: https://github.com/nxnguyen/amobi-sync-dart
 description: PowerSync Flutter SDK. Sync Postgres, MongoDB or MySQL with SQLite in your Flutter app

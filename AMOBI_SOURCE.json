@@ -1,24 +1,15 @@
 {
   "repository": "https://github.com/nxnguyen/amobi-sync-dart",
-  "tag": "amobi-1.18.0-core1.8.0.2",
-  "source_snapshot": "f5ae2d2b031c81ad91c11f486b08fcfd4d820882",
+  "tag": "amobi-1.18.0-core1.8.0.3",
+  "source_snapshot": "872a6062316cec25d23657eac7e4bc34a29c96bd",
   "source_path": "clients/flutter_1_18",
   "upstream_repository": "https://github.com/powersync-ja/powersync.dart",
   "upstream_commit": "d915f34a19680c20089b217b1470d275b96260e7",
-  "previous_amobi_commit": "ccff25541a0e95d4db7f72d5d062ebf37e7491e5",
+  "previous_amobi_commit": "d689cfcb280c25669a3c6cc96cb7a09e635e838b",
   "package_path": "packages/powersync",
   "packages": {
-    "flutter": "1.18.0+amobi.2",
+    "flutter": "1.18.0+amobi.3",
     "core": "1.8.0+amobi.1"
   },
-  "status": "accepted: Git-resolved local SQLite and Rust HTTP tests passed",
-  "validated_candidate": "5925f59eed6e3ad565a0611d8a8ee1d26afef054",
-  "acceptance": {
-    "sdk_sqlite_tests": 7,
-    "rust_http_and_journal_tests": 13,
-    "ezai_new_focused_tests": 98,
-    "ezai_legacy_focused_tests": 39,
-    "old_sdk_hold_subprocess_tests": 4,
-    "normal_app_release": "not built or published"
-  }
+  "status": "SDK SQLite tests passed; consumer acceptance recorded in maintained rollout docs"
 }

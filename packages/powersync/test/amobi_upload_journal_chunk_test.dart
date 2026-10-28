@@ -146,6 +146,94 @@ void main() {
       });
     } finally { await dir.delete(recursive: true); }
   });
+  test('oversized later row holds the whole SDK head before any HTTP', () async {
+    final dir = await Directory.systemTemp.createTemp('ezai-later-oversize-');
+    try {
+      await _withDb('${dir.path}/owner.db', (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        await db.writeTransaction((tx) async {
+          await tx.execute('INSERT INTO chat_table_ez_ai_app(id,history_id,content) VALUES(?,?,?)',
+              ['small', 'session', 'first']);
+          await tx.execute('INSERT INTO chat_table_ez_ai_app(id,history_id,file_data) VALUES(?,?,?)',
+              ['oversized', 'session', 'x' * (6 * 1024 * 1024)]);
+        });
+        expect((await db.getNextCrudTransaction())!.crud, hasLength(2));
+        var calls = 0;
+        await expectLater(_upload(journal, (key, body) async {
+          calls++;
+          return _ack(key, (jsonDecode(body)['batch'] as List).length);
+        }), throwsA(isA<AmobiUploadHeldException>()));
+        expect(calls, 0);
+        expect(await db.getAll('SELECT id FROM ps_crud'), hasLength(2));
+        expect(await db.getAll('SELECT upload_key FROM amobi_ezai_upload_journal_pending'), isEmpty);
+      });
+    } finally { await dir.delete(recursive: true); }
+  });
+  test('raw SDK head above 16 MiB is rejected before planning body bytes', () async {
+    final dir = await Directory.systemTemp.createTemp('ezai-oversize-head-');
+    try {
+      await _withDb('${dir.path}/owner.db', (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        final payload = 'x' * (5 * 1024 * 1024 + 512 * 1024);
+        await db.writeTransaction((tx) async {
+          for (var i = 0; i < 3; i++) {
+            await tx.execute('INSERT INTO chat_table_ez_ai_app(id,history_id,file_data) VALUES(?,?,?)',
+                ['large-$i', 'session', payload]);
+          }
+        });
+        var built = 0;
+        var sent = 0;
+        await expectLater(journal.upload(uid: 'owner-a', isCurrent: () => true,
+          buildBody: (entries) { built++; return _body(entries); },
+          transport: (key, body) async { sent++; return _ack(key, 1); },
+        ), throwsA(isA<AmobiUploadHeldException>()));
+        expect(built, 0);
+        expect(sent, 0);
+        expect(await db.getAll('SELECT id FROM ps_crud'), hasLength(3));
+      });
+    } finally { await dir.delete(recursive: true); }
+  });
+  test('existing frozen first chunk is unchanged when a later row cannot fit', () async {
+    final dir = await Directory.systemTemp.createTemp('ezai-pending-later-oversize-');
+    final file = '${dir.path}/owner.db';
+    try {
+      late String frozenKey;
+      late String frozenBody;
+      await _withDb(file, (db) async {
+        await AmobiUploadJournal.initialize(db);
+        await db.writeTransaction((tx) async {
+          await tx.execute('INSERT INTO chat_table_ez_ai_app(id,history_id,content) VALUES(?,?,?)',
+              ['small', 'session', 'first']);
+          await tx.execute('INSERT INTO chat_table_ez_ai_app(id,history_id,file_data) VALUES(?,?,?)',
+              ['oversized', 'session', 'x' * (6 * 1024 * 1024)]);
+        });
+        final transaction = (await db.getNextCrudTransaction())!;
+        final rows = await db.getAll('SELECT id,tx_id,data FROM ps_crud ORDER BY id');
+        final rawHead = jsonEncode([for (final row in rows) {'id': row['id'], 'tx_id': row['tx_id'], 'data': row['data']}]);
+        frozenKey = '$amobiUploadProtocol-33333333-3333-4333-8333-333333333333';
+        frozenBody = _body(transaction.crud.sublist(0, 1));
+        await db.execute(
+          'INSERT INTO amobi_ezai_upload_journal_pending(singleton,upload_key,uid,client_id,raw_head,body,entry_count,outcome,chunk_offset) VALUES(1,?,?,?,?,?,?,0,0)',
+          [frozenKey, 'owner-a', await db.getClientId(), rawHead, utf8.encode(frozenBody), 1],
+        );
+      });
+      await _withDb(file, (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        var calls = 0;
+        await expectLater(_upload(journal, (key, body) async {
+          calls++;
+          return _ack(key, (jsonDecode(body)['batch'] as List).length);
+        }), throwsA(isA<AmobiUploadHeldException>()));
+        expect(calls, 0);
+        final pending = await db.get('SELECT upload_key,body,outcome,chunk_offset FROM amobi_ezai_upload_journal_pending');
+        expect(pending['upload_key'], frozenKey);
+        expect(utf8.decode(pending['body'] as List<int>), frozenBody);
+        expect(pending['outcome'], 0);
+        expect(pending['chunk_offset'], 0);
+        expect(await db.getAll('SELECT id FROM ps_crud'), hasLength(2));
+      });
+    } finally { await dir.delete(recursive: true); }
+  });
   test('failed second chunk keeps its own frozen key and does not replay acknowledged first chunk', () async {
     final dir = await Directory.systemTemp.createTemp('ezai-later-chunk-failure-');
     final file = '${dir.path}/owner.db';

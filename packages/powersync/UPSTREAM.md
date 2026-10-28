@@ -12,7 +12,7 @@ Upstream repository: https://github.com/powersync-ja/powersync.dart
 
 Maintained Amobi repository:
 `https://github.com/nxnguyen/amobi-sync-dart`, tag
-`amobi-1.18.0-core1.8.0.2`. The exact commit is recorded in
+`amobi-1.18.0-core1.8.0.3`. The exact commit is recorded in
 `clients/GITHUB_FORKS.json` in the maintained server repository.
 Git package paths are `packages/powersync` and `packages/powersync_core`;
 the maintained local mirrors remain `clients/flutter_1_18` and its `core/`.
@@ -52,3 +52,12 @@ entries. The package test needs PowerSync SQLite core 0.4.11 on macOS ARM64
 Set `POWERSYNC_EXTENSION` to that dylib when running from a standalone checkout;
 the maintained Work checkout defaults to `../dart/.native/libpowersync.dylib`.
 The app's pinned Flutter native plugin remains `0.4.15+1`.
+
+The `.3` journal validates the complete bounded SDK head and all remaining
+chunk bodies before sending or retrying HTTP. A later single row above 6 MiB
+therefore holds the queue before any new partial remote write. Planned bodies
+are capped at 24 MiB, and the raw head is checked before planning. An existing
+frozen pending key/body remains unchanged if a later row cannot fit. Already
+partially accepted `.2` heads with an oversized row still require reconciliation;
+this change does not infer a rollback of remote writes. Ten real SDK SQLite
+regressions, including both oversize paths and the raw-head bound, pass.
