@@ -1,6 +1,6 @@
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/src/sync/bucket_storage.dart';
-import 'package:powersync_core/src/sync/protocol.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/src/sync/bucket_storage.dart';
+import 'package:amobi_sync_core/src/sync/protocol.dart';
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:test/test.dart';
 

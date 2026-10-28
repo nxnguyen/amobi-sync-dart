@@ -11,12 +11,12 @@ import 'package:async/async.dart';
 import 'package:collection/collection.dart';
 import 'package:http/browser_client.dart';
 import 'package:logging/logging.dart';
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/sqlite_async.dart';
-import 'package:powersync_core/src/database/powersync_db_mixin.dart';
-import 'package:powersync_core/src/sync/internal_connector.dart';
-import 'package:powersync_core/src/sync/options.dart';
-import 'package:powersync_core/src/sync/streaming_sync.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/sqlite_async.dart';
+import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
+import 'package:amobi_sync_core/src/sync/internal_connector.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/src/sync/streaming_sync.dart';
 import 'package:sqlite_async/web.dart';
 import 'package:web/web.dart' hide RequestMode;
 

@@ -1,4 +1,4 @@
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:test/test.dart';
 

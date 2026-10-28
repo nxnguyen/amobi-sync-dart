@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:powersync_core/src/open_factory/abstract_powersync_open_factory.dart';
-import 'package:powersync_core/src/uuid.dart';
+import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
+import 'package:amobi_sync_core/src/uuid.dart';
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:sqlite_async/sqlite3_web.dart';
 import 'package:sqlite_async/sqlite_async.dart';

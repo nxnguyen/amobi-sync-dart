@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:sqlite_async/src/utils/shared_utils.dart';
 import 'package:test/test.dart';
 

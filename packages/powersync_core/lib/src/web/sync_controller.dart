@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:js_interop';
 
-import 'package:powersync_core/powersync_core.dart';
-import 'package:powersync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
 import 'package:sqlite_async/web.dart';
 import 'package:web/web.dart';
 

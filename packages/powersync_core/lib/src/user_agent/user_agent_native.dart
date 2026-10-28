@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:powersync_core/src/version.dart';
+import 'package:amobi_sync_core/src/version.dart';
 
 String powerSyncUserAgent() {
   var dartVersion = RegExp(r'[\w.]+').stringMatch(Platform.version);

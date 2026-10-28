@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:logging/logging.dart';
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:sqlite_async/sqlite3_wasm.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 import 'package:test/test.dart';

@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:meta/meta.dart';
-import 'package:powersync_core/src/abort_controller.dart';
-import 'package:powersync_core/src/connector.dart';
-import 'package:powersync_core/src/database/active_instances.dart';
-import 'package:powersync_core/src/database/powersync_db_mixin.dart';
-import 'package:powersync_core/src/sync/options.dart';
-import 'package:powersync_core/src/sync/stream.dart';
-import 'package:powersync_core/src/sync/sync_status.dart';
+import 'package:amobi_sync_core/src/abort_controller.dart';
+import 'package:amobi_sync_core/src/connector.dart';
+import 'package:amobi_sync_core/src/database/active_instances.dart';
+import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/src/sync/stream.dart';
+import 'package:amobi_sync_core/src/sync/sync_status.dart';
 
 import 'instruction.dart';
 import 'mutable_sync_status.dart';

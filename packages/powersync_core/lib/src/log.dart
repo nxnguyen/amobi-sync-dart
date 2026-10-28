@@ -1,5 +1,5 @@
 import 'package:logging/logging.dart';
-import 'package:powersync_core/src/log_internal.dart';
+import 'package:amobi_sync_core/src/log_internal.dart';
 
 /// Logger that outputs to the console in debug mode, and nothing
 /// in release and profile modes.

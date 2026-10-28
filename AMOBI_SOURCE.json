@@ -1,0 +1,20 @@
+{
+  "base": "357cf3939e2e7def2ff256d548abc57172b1ade0",
+  "component_upstreams": {
+    "powersync": "c703e04bfda4353c2cac1b2cfb89690b8ef501af",
+    "powersync_core": "357cf3939e2e7def2ff256d548abc57172b1ade0"
+  },
+  "local": "flutter",
+  "maintenance": "Pinned Amobi source tag; default branch remains an upstream tracking branch.",
+  "packages": {
+    "core": "1.7.0+amobi.1",
+    "flutter": "1.16.2+amobi.1"
+  },
+  "repo": "amobi-sync-dart",
+  "repository": "https://github.com/nxnguyen/amobi-sync-dart",
+  "source_path": "clients/flutter",
+  "source_snapshot": "a2986deecb04cda1efa99da66ca67799e55e5347",
+  "tag": "amobi-1.16.2-core1.7.0.1",
+  "upstream": "powersync.dart",
+  "upstream_repository": "https://github.com/powersync-ja/powersync.dart"
+}

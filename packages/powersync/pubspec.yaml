@@ -1,8 +1,7 @@
-name: powersync
-version: 1.17.0
-homepage: https://powersync.com
-repository: https://github.com/powersync-ja/powersync.dart
-description: PowerSync Flutter SDK. Sync Postgres, MongoDB or MySQL with SQLite in your Flutter app
+name: amobi_sync_flutter
+version: 1.16.2+amobi.1
+description: Amobi Sync Flutter client fork, API-compatible with PowerSync 1.16.2
+publish_to: none
 environment:
   sdk: ^3.4.0
 
@@ -12,9 +11,10 @@ dependencies:
     sdk: flutter
 
   sqlite3_flutter_libs: ^0.5.39
-  powersync_core: ^1.7.0
-  powersync_flutter_libs: ^0.4.14
-  collection: ^1.17.0
+  amobi_sync_core:
+    path: ../powersync_core
+  powersync_flutter_libs: 0.4.15+1
+  collection: ^1.19.0
 
 dev_dependencies:
   lints: ^5.1.0

@@ -17,7 +17,12 @@ Future<void> downloadWebAssets(List<String> arguments,
   // Pass the --output-dir argument to specify the output directory
   // dart run powersync:setup_web --output-dir assets
   parser.addOption('output-dir', abbr: 'o', defaultsTo: 'web');
+  parser.addFlag('help', abbr: 'h', negatable: false);
   var results = parser.parse(arguments);
+  if (results.flag('help')) {
+    print(parser.usage);
+    return;
+  }
   bool downloadWorker = results.flag('worker');
   String outputDir = results.option('output-dir')!;
 
@@ -107,12 +112,12 @@ Future<void> downloadWebAssets(List<String> arguments,
 
 Future<({String tag, Version version})> powerSyncVersionOrLatest(
     HttpClient client, dynamic packageConfig, File packageConfigFile) async {
+  const forkPackageName = 'amobi_sync_flutter';
   const powersyncPackageName = 'powersync';
-  // Don't require powersync dependency. The user has one if running this script
-  // and we also want to support powersync_sqlcipher (for which we download
-  // the latest versions).
-  final powersyncPkg = getPackageFromConfig(packageConfig, powersyncPackageName,
-      required: false);
+  final forkPkg = getPackageFromConfig(packageConfig, forkPackageName);
+  final powersyncPkg = forkPkg ?? getPackageFromConfig(packageConfig, powersyncPackageName);
+  // Keep the upstream fallback for apps using powersync_sqlcipher without
+  // either Flutter package in their resolution.
   if (powersyncPkg == null) {
     final [tag, ...] =
         await getLatestTagsFromRelease(client, repo: 'powersync.dart');
@@ -123,8 +128,9 @@ Future<({String tag, Version version})> powerSyncVersionOrLatest(
     );
   }
 
-  final powersyncVersion =
-      getPubspecVersion(packageConfigFile, powersyncPkg, powersyncPackageName);
+  final packageVersion = getPubspecVersion(packageConfigFile, powersyncPkg,
+      forkPkg == null ? powersyncPackageName : forkPackageName);
+  final powersyncVersion = forkPkg == null ? packageVersion : packageVersion.split('+').first;
   return (
     tag: 'powersync-v$powersyncVersion',
     version: Version.parse(powersyncVersion),

@@ -5,11 +5,11 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
-import 'package:powersync_core/src/abort_controller.dart';
-import 'package:powersync_core/src/exceptions.dart';
-import 'package:powersync_core/src/log_internal.dart';
-import 'package:powersync_core/src/sync/options.dart';
-import 'package:powersync_core/src/user_agent/user_agent.dart';
+import 'package:amobi_sync_core/src/abort_controller.dart';
+import 'package:amobi_sync_core/src/exceptions.dart';
+import 'package:amobi_sync_core/src/log_internal.dart';
+import 'package:amobi_sync_core/src/sync/options.dart';
+import 'package:amobi_sync_core/src/user_agent/user_agent.dart';
 import 'package:sqlite_async/mutex.dart';
 
 import '../crud.dart';

@@ -1,4 +1,4 @@
-import 'package:powersync_core/src/version.dart';
+import 'package:amobi_sync_core/src/version.dart';
 
 String powerSyncUserAgent() {
   return 'powersync-dart-core/$libraryVersion Dart (flutter-web)';

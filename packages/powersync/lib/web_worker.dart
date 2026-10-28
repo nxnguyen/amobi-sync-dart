@@ -1,1 +1,1 @@
-export 'package:powersync_core/src/web/powersync_db.worker.dart';
+export 'package:amobi_sync_core/src/web/powersync_db.worker.dart';

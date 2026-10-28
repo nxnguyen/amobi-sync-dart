@@ -1,4 +1,4 @@
 // ignore: implementation_imports
-import 'package:powersync_core/src/setup_web.dart';
+import 'package:amobi_sync_core/src/setup_web.dart';
 
 void main(List<String> args) => downloadWebAssets(args);

@@ -1,6 +1,6 @@
 import 'dart:js_interop';
 
-import 'package:powersync_core/src/open_factory/common_db_functions.dart';
+import 'package:amobi_sync_core/src/open_factory/common_db_functions.dart';
 import 'package:sqlite_async/sqlite3_wasm.dart';
 import 'package:sqlite_async/sqlite3_web.dart';
 import 'package:sqlite_async/sqlite3_web_worker.dart';

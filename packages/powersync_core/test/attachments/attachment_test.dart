@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import 'package:async/async.dart';
 import 'package:logging/logging.dart';
 import 'package:mockito/mockito.dart';
-import 'package:powersync_core/attachments/attachments.dart';
-import 'package:powersync_core/powersync_core.dart';
+import 'package:amobi_sync_core/attachments/attachments.dart';
+import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:test/test.dart';
 
 import '../utils/abstract_test_utils.dart';

@@ -1,4 +1,4 @@
-/// @docImport 'package:powersync_core/attachments/io.dart';
+/// @docImport 'package:amobi_sync_core/attachments/io.dart';
 library;
 
 import 'dart:typed_data';
