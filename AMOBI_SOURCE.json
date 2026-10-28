@@ -1,16 +1,15 @@
 {
-  "base": "d915f34a19680c20089b217b1470d275b96260e7",
-  "local": "flutter_1_18",
-  "maintenance": "Pinned Amobi source tag; default branch remains an upstream tracking branch.",
-  "packages": {
-    "core": "1.8.0+amobi.1",
-    "flutter": "1.18.0+amobi.1"
-  },
-  "repo": "amobi-sync-dart",
   "repository": "https://github.com/nxnguyen/amobi-sync-dart",
+  "tag": "amobi-1.18.0-core1.8.0.2-rc.1",
+  "source_snapshot": "f5ae2d2b031c81ad91c11f486b08fcfd4d820882",
   "source_path": "clients/flutter_1_18",
-  "source_snapshot": "a2986deecb04cda1efa99da66ca67799e55e5347",
-  "tag": "amobi-1.18.0-core1.8.0.1",
-  "upstream": "powersync.dart",
-  "upstream_repository": "https://github.com/powersync-ja/powersync.dart"
+  "upstream_repository": "https://github.com/powersync-ja/powersync.dart",
+  "upstream_commit": "d915f34a19680c20089b217b1470d275b96260e7",
+  "previous_amobi_commit": "ccff25541a0e95d4db7f72d5d062ebf37e7491e5",
+  "package_path": "packages/powersync",
+  "packages": {
+    "flutter": "1.18.0+amobi.2",
+    "core": "1.8.0+amobi.1"
+  },
+  "status": "candidate: local SQLite tests passed; awaiting Git-resolved Rust HTTP acceptance"
 }

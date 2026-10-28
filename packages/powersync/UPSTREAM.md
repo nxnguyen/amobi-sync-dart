@@ -11,8 +11,10 @@ Sources were copied from the exact pub.dev packages resolved by EzAI new\'s `pub
 Upstream repository: https://github.com/powersync-ja/powersync.dart
 
 Maintained Amobi repository:
-`https://github.com/nxnguyen/amobi-sync-dart`,
-package paths `packages/powersync` and `packages/powersync_core`.
+`https://github.com/nxnguyen/amobi-sync-dart`, tag
+`amobi-1.18.0-core1.8.0.1`, commit `ccff25541a0e95d4db7f72d5d062ebf37e7491e5`.
+Git package paths are `packages/powersync` and `packages/powersync_core`;
+the maintained local mirrors remain `clients/flutter_1_18` and its `core/`.
 Package repository metadata points here; upstream attribution stays above.
 
 Dart runtime/test sources differ only in package namespace references. `bin/setup_web.dart` retains the upstream CLI, with core asset selection recognizing `amobi_sync_flutter` and stripping fork build metadata to select the upstream 1.18.0 assets. The native plugin stays at 0.4.15+1. Protocol, schema, queue, checkpoint, and migration code are unchanged. Upstream LICENSE and NOTICE are retained in both package roots.
@@ -24,8 +26,26 @@ queue completion. These files were adapted from the Money journal, but use
 EzAI-specific metadata table and protocol names, a 6 MiB body bound, a 16 MiB
 raw-head bound, and an exact all-applied ACK. Money's fork and app are unchanged.
 
+The `.2` extension splits one frozen SDK head into requests of at most 100 CRUD
+entries and 6 MiB. Each chunk has its own durable UUID/body and advances only
+after an exact ACK; the SDK head retires after the last chunk. Server atomicity
+is per HTTP request. Existing `.1` frozen requests retain their original key and
+bytes; an old oversized frozen request stays held for reconciliation. The old
+`.1` journal refuses a new partial-head record before HTTP. The stable published
+revision above remains `.1` until the `.2` Git candidate passes acceptance.
+
 The same-file test proves an upstream 1.18.0 client can reopen a file containing
 the fork's pending metadata without deleting it. It does not authorize upstream
 uploads after rollback. An older client must remain offline while pending
 outcomes are reconciled; new writes made by an upstream client after the fork's
 state marker exists cannot be distinguished from fork writes by this journal.
+
+`test/amobi_upload_journal_chunk_test.dart` uses a minimal SDK schema with the
+EzAI chat/history table names and only the columns exercised by its SQLite
+transactions. The separate EzAI New repository test uses the actual app schema
+and confirms that deleting 102 messages plus their session creates 103 SDK CRUD
+entries. The package test needs PowerSync SQLite core 0.4.11 on macOS ARM64
+(SHA-256 `43d6cc2d7df407e1936b95610e54f2a59aaf0663184eec8691c074b16f53d895`).
+Set `POWERSYNC_EXTENSION` to that dylib when running from a standalone checkout;
+the maintained Work checkout defaults to `../dart/.native/libpowersync.dylib`.
+The app's pinned Flutter native plugin remains `0.4.15+1`.
