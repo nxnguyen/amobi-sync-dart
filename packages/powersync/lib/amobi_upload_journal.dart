@@ -109,8 +109,8 @@ final class AmobiUploadJournal {
   }
 
   Future<void> guardDestructiveClear() => _serialize(() async {
-        if (await _hasPendingOrHeld()) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
-      });
+    if (await _hasPendingOrHeld()) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
+  });
 
   /// Call only after an explicitly acknowledged account deletion and a
   /// successful SDK disconnectAndClear. The caller must initialize a new
@@ -134,15 +134,14 @@ final class AmobiUploadJournal {
     required String Function(List<CrudEntry>) buildBody,
     required Future<http.Response> Function(String key, String body) transport,
     required bool Function() isCurrent,
-  }) =>
-      _serialize(
-        () => _upload(
-          uid: uid,
-          buildBody: buildBody,
-          transport: transport,
-          isCurrent: isCurrent,
-        ),
-      );
+  }) => _serialize(
+    () => _upload(
+      uid: uid,
+      buildBody: buildBody,
+      transport: transport,
+      isCurrent: isCurrent,
+    ),
+  );
 
   Future<T> _serialize<T>(Future<T> Function() operation) async {
     final previous = _owners[_path];
