@@ -109,8 +109,8 @@ final class AmobiUploadJournal {
   }
 
   Future<void> guardDestructiveClear() => _serialize(() async {
-    if (await _hasPendingOrHeld()) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
-  });
+        if (await _hasPendingOrHeld()) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
+      });
 
   /// Call only after an explicitly acknowledged account deletion and a
   /// successful SDK disconnectAndClear. The caller must initialize a new
@@ -134,14 +134,15 @@ final class AmobiUploadJournal {
     required String Function(List<CrudEntry>) buildBody,
     required Future<http.Response> Function(String key, String body) transport,
     required bool Function() isCurrent,
-  }) => _serialize(
-    () => _upload(
-      uid: uid,
-      buildBody: buildBody,
-      transport: transport,
-      isCurrent: isCurrent,
-    ),
-  );
+  }) =>
+      _serialize(
+        () => _upload(
+          uid: uid,
+          buildBody: buildBody,
+          transport: transport,
+          isCurrent: isCurrent,
+        ),
+      );
 
   Future<T> _serialize<T>(Future<T> Function() operation) async {
     final previous = _owners[_path];
@@ -239,7 +240,7 @@ final class AmobiUploadJournal {
           current();
           throw const AmobiUploadTransportException();
         }
-        if (!_validAcknowledgement(response, active.key, active.entryCount)) {
+        if (!_validAcknowledgement(response, active.key, active.entryCount, active.body)) {
           if (response.statusCode == 200) {
             await database.execute(
               "UPDATE $_pendingTable SET outcome=2 WHERE singleton=1 AND upload_key=? AND outcome=0",
@@ -497,7 +498,7 @@ final class AmobiUploadJournal {
     }
   }
 
-  bool _validAcknowledgement(http.Response response, String key, int entryCount) {
+  bool _validAcknowledgement(http.Response response, String key, int entryCount, List<int> requestBody) {
     if (response.statusCode != 200 ||
         response.bodyBytes.length > 64 * 1024 ||
         _header(response, "idempotency-key") != key ||
@@ -509,9 +510,46 @@ final class AmobiUploadJournal {
       if (body is! Map<String, dynamic> || body.length != 3 || body["ok"] != true) return false;
       final applied = body["applied"];
       final skipped = body["skipped"];
-      return applied is int && skipped is int && applied >= 0 && skipped >= 0 && applied == entryCount && skipped == 0;
+      final expectedSkipped = _expectedLocalSkips(requestBody, entryCount);
+      return applied is int &&
+          skipped is int &&
+          expectedSkipped != null &&
+          applied >= 0 &&
+          skipped >= 0 &&
+          skipped == expectedSkipped &&
+          applied == entryCount - expectedSkipped;
     } catch (_) {
       return false;
+    }
+  }
+
+  int? _expectedLocalSkips(List<int> requestBody, int entryCount) {
+    try {
+      final decoded = jsonDecode(utf8.decode(requestBody));
+      if (decoded is! Map<String, dynamic> || decoded["batch"] is! List) return null;
+      final batch = decoded["batch"] as List;
+      if (batch.length != entryCount) return null;
+      var skipped = 0;
+      for (final entry in batch) {
+        if (entry is! Map<String, dynamic>) return null;
+        final op = entry["op"];
+        if (op == "SKIP") {
+          final data = entry["data"];
+          if (entry["table"] != "stored_files_table" ||
+              data is! Map<String, dynamic> ||
+              data.length != 2 ||
+              data["id"] is! String ||
+              data["user_id"] is! String) {
+            return null;
+          }
+          skipped++;
+        } else if (!const {"PUT", "PATCH", "DELETE"}.contains(op)) {
+          return null;
+        }
+      }
+      return skipped;
+    } catch (_) {
+      return null;
     }
   }
 
