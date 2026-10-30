@@ -8,20 +8,20 @@ import "package:uuid/uuid.dart";
 
 // This source is imported directly by the standalone upstream/fork acceptance harness.
 // ignore: always_use_package_imports
-import "amobi_upload_path_web.dart" if (dart.library.io) "amobi_upload_path_io.dart" as upload_path;
+import "amobi_upload_path_web.dart"
+    if (dart.library.io) "amobi_upload_path_io.dart" as upload_path;
 
 const amobiUploadProtocol = "amobi-ezai-upload-v1";
-const _stateTable = "amobi_ezai_upload_journal_state";
-const _pendingTable = "amobi_ezai_upload_journal_pending";
 const _maxEntries = 5000;
 const _maxBatchEntries = 100;
 const int _maxBodyBytes = 6 * 1024 * 1024;
 const int _maxHeadBytes = 16 * 1024 * 1024;
 // At most 16 MiB raw SDK head plus 8 MiB for per-entry owner/envelope fields.
 const int _maxPlannedBytes = _maxHeadBytes + 8 * 1024 * 1024;
-final _uploadKeyPattern = RegExp(
-  r"^amobi-ezai-upload-v1-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-);
+final _uploadProtocolPattern =
+    RegExp(r"^amobi-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)-upload-v1$");
+const _uploadUuidPattern =
+    r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
 enum AmobiUploadHoldReason {
   legacyQueue,
@@ -46,7 +46,8 @@ class AmobiUploadTransportException implements Exception {
   final int? statusCode;
 
   @override
-  String toString() => "Amobi upload not acknowledged${statusCode == null ? "" : ": $statusCode"}";
+  String toString() =>
+      "Amobi upload not acknowledged${statusCode == null ? "" : ": $statusCode"}";
 }
 
 class AmobiUploadSessionChangedException implements Exception {
@@ -56,45 +57,101 @@ class AmobiUploadSessionChangedException implements Exception {
 /// A single durable outbox head for a PowerSync database file. Initialize before
 /// any app or migration writes. Existing unmarked queues are permanently held.
 final class AmobiUploadJournal {
-  AmobiUploadJournal._(this.database, this._path, this.legacyHeld);
+  AmobiUploadJournal._(
+    this.database,
+    this._path,
+    this.legacyHeld,
+    this.protocol,
+    this._stateTable,
+    this._pendingTable,
+    this._uploadKeyPattern,
+    this.maxBatchEntries,
+    this.maxBodyBytes,
+  );
 
   final PowerSyncDatabase database;
   final String _path;
   final bool legacyHeld;
+  final String protocol;
+  final String _stateTable;
+  final String _pendingTable;
+  final RegExp _uploadKeyPattern;
+  final int maxBatchEntries;
+  final int maxBodyBytes;
   static final Map<String, Future<void>> _owners = {};
 
-  static Future<AmobiUploadJournal> initialize(PowerSyncDatabase database) async {
+  static Future<AmobiUploadJournal> initialize(
+    PowerSyncDatabase database, {
+    String protocol = amobiUploadProtocol,
+    int maxBatchEntries = _maxBatchEntries,
+    int maxBodyBytes = _maxBodyBytes,
+  }) async {
+    if (maxBatchEntries < 1 || maxBatchEntries > _maxBatchEntries) {
+      throw ArgumentError.value(maxBatchEntries, "maxBatchEntries",
+          "must be between 1 and $_maxBatchEntries");
+    }
+    if (maxBodyBytes < 1 || maxBodyBytes > _maxBodyBytes) {
+      throw ArgumentError.value(
+          maxBodyBytes, "maxBodyBytes", "must be between 1 and $_maxBodyBytes");
+    }
+    final protocolMatch = _uploadProtocolPattern.firstMatch(protocol);
+    if (protocolMatch == null)
+      throw ArgumentError.value(
+          protocol, "protocol", "invalid Amobi upload protocol");
+    final namespace = protocolMatch.group(1)!;
+    final stateTable =
+        "amobi_${namespace.replaceAll('-', '_')}_upload_journal_state";
+    final pendingTable =
+        "amobi_${namespace.replaceAll('-', '_')}_upload_journal_pending";
+    final uploadKeyPattern =
+        RegExp("^${RegExp.escape(protocol)}-$_uploadUuidPattern\$");
     await database.initialize();
-    final path = await upload_path.canonicalUploadPath(database.database.openFactory.path);
+    final path = await upload_path
+        .canonicalUploadPath(database.database.openFactory.path);
     await database.writeTransaction((tx) async {
       await tx.execute(
-        "CREATE TABLE IF NOT EXISTS $_stateTable("
+        "CREATE TABLE IF NOT EXISTS $stateTable("
         "singleton INTEGER PRIMARY KEY CHECK(singleton=1), legacy_held INTEGER NOT NULL CHECK(legacy_held IN (0,1)))",
       );
       await tx.execute(
-        "CREATE TABLE IF NOT EXISTS $_pendingTable("
+        "CREATE TABLE IF NOT EXISTS $pendingTable("
         "singleton INTEGER PRIMARY KEY CHECK(singleton=1), upload_key TEXT NOT NULL UNIQUE,"
         "uid TEXT NOT NULL, client_id TEXT NOT NULL, raw_head TEXT NOT NULL,"
         "body BLOB NOT NULL, entry_count INTEGER NOT NULL, outcome INTEGER NOT NULL CHECK(outcome IN (0,1,2)),"
         "chunk_offset INTEGER NOT NULL DEFAULT 0)",
       );
-      final columns = await tx.execute("PRAGMA table_info($_pendingTable)");
+      final columns = await tx.execute("PRAGMA table_info($pendingTable)");
       if (!columns.any((column) => column["name"] == "chunk_offset")) {
-        await tx.execute("ALTER TABLE $_pendingTable ADD COLUMN chunk_offset INTEGER NOT NULL DEFAULT 0");
+        await tx.execute(
+            "ALTER TABLE $pendingTable ADD COLUMN chunk_offset INTEGER NOT NULL DEFAULT 0");
       }
-      final initialized = await tx.execute("SELECT legacy_held FROM $_stateTable WHERE singleton=1");
+      final initialized = await tx
+          .execute("SELECT legacy_held FROM $stateTable WHERE singleton=1");
       if (initialized.isEmpty) {
         final queue = await tx.execute("SELECT id FROM ps_crud LIMIT 1");
-        await tx.execute("INSERT INTO $_stateTable(singleton,legacy_held) VALUES(1,?)", [queue.isEmpty ? 0 : 1]);
+        await tx.execute(
+            "INSERT INTO $stateTable(singleton,legacy_held) VALUES(1,?)",
+            [queue.isEmpty ? 0 : 1]);
       }
     });
     final marker = await database.get(
-      "SELECT legacy_held,typeof(legacy_held) AS value_type FROM $_stateTable WHERE singleton=1",
+      "SELECT legacy_held,typeof(legacy_held) AS value_type FROM $stateTable WHERE singleton=1",
     );
-    if (marker["value_type"] != "integer" || marker["legacy_held"] != 0 && marker["legacy_held"] != 1) {
+    if (marker["value_type"] != "integer" ||
+        marker["legacy_held"] != 0 && marker["legacy_held"] != 1) {
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
     }
-    return AmobiUploadJournal._(database, path, marker["legacy_held"] == 1);
+    return AmobiUploadJournal._(
+      database,
+      path,
+      marker["legacy_held"] == 1,
+      protocol,
+      stateTable,
+      pendingTable,
+      uploadKeyPattern,
+      maxBatchEntries,
+      maxBodyBytes,
+    );
   }
 
   Future<bool> hasPendingOrHeld() => _serialize(_hasPendingOrHeld);
@@ -109,8 +166,10 @@ final class AmobiUploadJournal {
   }
 
   Future<void> guardDestructiveClear() => _serialize(() async {
-    if (await _hasPendingOrHeld()) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
-  });
+        if (await _hasPendingOrHeld())
+          throw const AmobiUploadHeldException(
+              AmobiUploadHoldReason.destructiveClear);
+      });
 
   /// Call only after an explicitly acknowledged account deletion and a
   /// successful SDK disconnectAndClear. The caller must initialize a new
@@ -118,7 +177,9 @@ final class AmobiUploadJournal {
   Future<void> eraseAfterAccountDeletion() async {
     await _serialize(() async {
       final queue = await database.getAll("SELECT id FROM ps_crud LIMIT 1");
-      if (queue.isNotEmpty) throw const AmobiUploadHeldException(AmobiUploadHoldReason.destructiveClear);
+      if (queue.isNotEmpty)
+        throw const AmobiUploadHeldException(
+            AmobiUploadHoldReason.destructiveClear);
       await database.writeTransaction((tx) async {
         await tx.execute("DELETE FROM $_pendingTable");
         await tx.execute("DELETE FROM $_stateTable");
@@ -134,14 +195,15 @@ final class AmobiUploadJournal {
     required String Function(List<CrudEntry>) buildBody,
     required Future<http.Response> Function(String key, String body) transport,
     required bool Function() isCurrent,
-  }) => _serialize(
-    () => _upload(
-      uid: uid,
-      buildBody: buildBody,
-      transport: transport,
-      isCurrent: isCurrent,
-    ),
-  );
+  }) =>
+      _serialize(
+        () => _upload(
+          uid: uid,
+          buildBody: buildBody,
+          transport: transport,
+          isCurrent: isCurrent,
+        ),
+      );
 
   Future<T> _serialize<T>(Future<T> Function() operation) async {
     final previous = _owners[_path];
@@ -167,10 +229,15 @@ final class AmobiUploadJournal {
     }
 
     current();
-    if (legacyHeld) throw const AmobiUploadHeldException(AmobiUploadHoldReason.legacyQueue);
+    if (legacyHeld)
+      throw const AmobiUploadHeldException(AmobiUploadHoldReason.legacyQueue);
     final clientId = await database.getClientId();
-    if (uid.isEmpty || clientId.isEmpty || utf8.encode(uid).length > 512 || utf8.encode(clientId).length > 128) {
-      throw const AmobiUploadHeldException(AmobiUploadHoldReason.identityChanged);
+    if (uid.isEmpty ||
+        clientId.isEmpty ||
+        utf8.encode(uid).length > 512 ||
+        utf8.encode(clientId).length > 128) {
+      throw const AmobiUploadHeldException(
+          AmobiUploadHoldReason.identityChanged);
     }
     current();
     var pending = await _pending();
@@ -180,21 +247,26 @@ final class AmobiUploadJournal {
     if (pending == null && transaction == null) return false;
 
     if (pending == null) {
-      if (transaction == null) throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+      if (transaction == null)
+        throw const AmobiUploadHeldException(
+            AmobiUploadHoldReason.invalidState);
       if (transaction.crud.isEmpty || transaction.crud.length > _maxEntries) {
         throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
       }
       final head = await _rawHead(transaction);
-      if (head == null) throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
+      if (head == null)
+        throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
       final planned = _planChunks(transaction.crud, 0, buildBody);
       final firstChunk = planned.first;
       plannedRemaining = planned.sublist(1);
       current();
-      final key = "$amobiUploadProtocol-${const Uuid().v4()}";
+      final key = "$protocol-${const Uuid().v4()}";
       await database.writeTransaction((tx) async {
         current();
         final stillHead = await _rawHead(transaction!, tx: tx);
-        if (stillHead != head) throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
+        if (stillHead != head)
+          throw const AmobiUploadHeldException(
+              AmobiUploadHoldReason.headChanged);
         await tx.execute(
           "INSERT INTO $_pendingTable(singleton,upload_key,uid,client_id,raw_head,body,entry_count,outcome,chunk_offset) "
           "VALUES(1,?,?,?,?,?,?,0,0)",
@@ -205,28 +277,35 @@ final class AmobiUploadJournal {
     }
 
     if (pending == null || pending.uid != uid || pending.clientId != clientId) {
-      throw const AmobiUploadHeldException(AmobiUploadHoldReason.identityChanged);
+      throw const AmobiUploadHeldException(
+          AmobiUploadHoldReason.identityChanged);
     }
-    if (pending.ambiguous) throw const AmobiUploadHeldException(AmobiUploadHoldReason.ambiguousAck);
+    if (pending.ambiguous)
+      throw const AmobiUploadHeldException(AmobiUploadHoldReason.ambiguousAck);
     current();
     transaction = await database.getNextCrudTransaction();
-    final currentHead = transaction == null ? null : await _rawHead(transaction);
+    final currentHead =
+        transaction == null ? null : await _rawHead(transaction);
     current();
     if (currentHead != pending.rawHead) {
       if (pending.acknowledged &&
-          pending.chunkOffset + pending.entryCount == _capturedCount(pending.rawHead) &&
+          pending.chunkOffset + pending.entryCount ==
+              _capturedCount(pending.rawHead) &&
           await _allCapturedGone(pending.rawHead)) {
-        await database.execute("DELETE FROM $_pendingTable WHERE singleton=1 AND upload_key=?", [pending.key]);
+        await database.execute(
+            "DELETE FROM $_pendingTable WHERE singleton=1 AND upload_key=?",
+            [pending.key]);
         return true;
       }
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
     }
     if (transaction == null ||
-        pending.entryCount > _maxBatchEntries ||
+        pending.entryCount > maxBatchEntries ||
         pending.chunkOffset + pending.entryCount > transaction.crud.length) {
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
     }
-    plannedRemaining ??= _planChunks(transaction.crud, pending.chunkOffset + pending.entryCount, buildBody);
+    plannedRemaining ??= _planChunks(
+        transaction.crud, pending.chunkOffset + pending.entryCount, buildBody);
     var plannedPosition = 0;
     current();
     var active = pending;
@@ -239,14 +318,16 @@ final class AmobiUploadJournal {
           current();
           throw const AmobiUploadTransportException();
         }
-        if (!_validAcknowledgement(response, active.key, active.entryCount, active.body)) {
+        if (!_validAcknowledgement(
+            response, active.key, active.entryCount, active.body)) {
           if (response.statusCode == 200) {
             await database.execute(
               "UPDATE $_pendingTable SET outcome=2 WHERE singleton=1 AND upload_key=? AND outcome=0",
               [active.key],
             );
             current();
-            throw const AmobiUploadHeldException(AmobiUploadHoldReason.ambiguousAck);
+            throw const AmobiUploadHeldException(
+                AmobiUploadHoldReason.ambiguousAck);
           }
           current();
           throw AmobiUploadTransportException(response.statusCode);
@@ -265,28 +346,43 @@ final class AmobiUploadJournal {
       if (nextOffset == transaction.crud.length) {
         await transaction.complete();
         current();
-        await database.execute("DELETE FROM $_pendingTable WHERE singleton=1 AND upload_key=?", [active.key]);
+        await database.execute(
+            "DELETE FROM $_pendingTable WHERE singleton=1 AND upload_key=?",
+            [active.key]);
         return true;
       }
       final nextChunk = plannedRemaining[plannedPosition++];
-      final nextKey = "$amobiUploadProtocol-${const Uuid().v4()}";
+      final nextKey = "$protocol-${const Uuid().v4()}";
       await database.writeTransaction((tx) async {
         current();
         if (await _rawHead(transaction!, tx: tx) != active.rawHead) {
-          throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
+          throw const AmobiUploadHeldException(
+              AmobiUploadHoldReason.headChanged);
         }
         await tx.execute(
           "UPDATE $_pendingTable SET upload_key=?,body=?,entry_count=?,chunk_offset=?,outcome=0 "
           "WHERE singleton=1 AND upload_key=? AND outcome=1 AND chunk_offset=?",
-          [nextKey, nextChunk.bytes, nextChunk.count, nextOffset, active.key, active.chunkOffset],
+          [
+            nextKey,
+            nextChunk.bytes,
+            nextChunk.count,
+            nextOffset,
+            active.key,
+            active.chunkOffset
+          ],
         );
         final changed = await tx.execute("SELECT changes() AS changed");
-        if (changed.single["changed"] != 1) throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+        if (changed.single["changed"] != 1)
+          throw const AmobiUploadHeldException(
+              AmobiUploadHoldReason.invalidState);
       });
       current();
       final nextPending = await _pending();
-      if (nextPending == null || nextPending.key != nextKey || nextPending.chunkOffset != nextOffset) {
-        throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+      if (nextPending == null ||
+          nextPending.key != nextKey ||
+          nextPending.chunkOffset != nextOffset) {
+        throw const AmobiUploadHeldException(
+            AmobiUploadHoldReason.invalidState);
       }
       active = nextPending;
     }
@@ -303,7 +399,8 @@ final class AmobiUploadJournal {
       "length(CAST(uid AS BLOB)) AS uid_bytes,length(CAST(client_id AS BLOB)) AS client_bytes,"
       "length(CAST(upload_key AS BLOB)) AS key_bytes,entry_count,outcome,chunk_offset FROM $_pendingTable LIMIT 2",
     );
-    if (sizes.length > 1) throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+    if (sizes.length > 1)
+      throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
     if (sizes.isEmpty) return null;
     final size = sizes.single;
     if (size["body_type"] != "blob" ||
@@ -316,7 +413,7 @@ final class AmobiUploadJournal {
         size["offset_type"] != "integer" ||
         size["body_bytes"] is! int ||
         (size["body_bytes"] as int) < 1 ||
-        (size["body_bytes"] as int) > _maxBodyBytes ||
+        (size["body_bytes"] as int) > maxBodyBytes ||
         size["head_bytes"] is! int ||
         (size["head_bytes"] as int) < 1 ||
         (size["head_bytes"] as int) > _maxHeadBytes ||
@@ -338,7 +435,8 @@ final class AmobiUploadJournal {
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
     }
     final rows = await database.getAll("SELECT * FROM $_pendingTable LIMIT 2");
-    if (rows.length > 1) throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+    if (rows.length > 1)
+      throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
     if (rows.isEmpty) return null;
     final row = rows.single;
     final body = row["body"];
@@ -353,7 +451,7 @@ final class AmobiUploadJournal {
         offset is! int ||
         offset < 0 ||
         offset >= _maxEntries ||
-        body.length > _maxBodyBytes ||
+        body.length > maxBodyBytes ||
         utf8.encode(rawHead).length > _maxHeadBytes ||
         row["upload_key"] is! String ||
         !_uploadKeyPattern.hasMatch(row["upload_key"] as String) ||
@@ -385,22 +483,24 @@ final class AmobiUploadJournal {
     int offset,
     String Function(List<CrudEntry>) buildBody,
   ) {
-    final limit = (entries.length - offset).clamp(0, _maxBatchEntries);
-    List<int> encode(int count) => utf8.encode(buildBody(entries.sublist(offset, offset + count)));
+    final limit = (entries.length - offset).clamp(0, maxBatchEntries);
+    List<int> encode(int count) =>
+        utf8.encode(buildBody(entries.sublist(offset, offset + count)));
     final first = encode(1);
-    if (first.isEmpty || first.length > _maxBodyBytes) {
+    if (first.isEmpty || first.length > maxBodyBytes) {
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
     }
     if (limit == 1) return (bytes: first, count: 1);
     final full = encode(limit);
-    if (full.isNotEmpty && full.length <= _maxBodyBytes) return (bytes: full, count: limit);
+    if (full.isNotEmpty && full.length <= maxBodyBytes)
+      return (bytes: full, count: limit);
     var low = 1;
     var high = limit;
     var best = first;
     while (high - low > 1) {
       final middle = (low + high) ~/ 2;
       final bytes = encode(middle);
-      if (bytes.isNotEmpty && bytes.length <= _maxBodyBytes) {
+      if (bytes.isNotEmpty && bytes.length <= maxBodyBytes) {
         low = middle;
         best = bytes;
       } else {
@@ -420,14 +520,16 @@ final class AmobiUploadJournal {
     while (offset < entries.length) {
       final chunk = _freezeChunk(entries, offset, buildBody);
       totalBytes += chunk.bytes.length;
-      if (totalBytes > _maxPlannedBytes) throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
+      if (totalBytes > _maxPlannedBytes)
+        throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
       chunks.add(chunk);
       offset += chunk.count;
     }
     return chunks;
   }
 
-  Future<String?> _rawHead(CrudTransaction transaction, {SqliteWriteContext? tx}) async {
+  Future<String?> _rawHead(CrudTransaction transaction,
+      {SqliteWriteContext? tx}) async {
     final entries = transaction.crud;
     if (entries.isEmpty || entries.length > _maxEntries) return null;
     final first = entries.first.clientId;
@@ -443,32 +545,38 @@ final class AmobiUploadJournal {
       ];
     } else {
       rows = [
-        for (final row in await tx.execute("SELECT id,tx_id,data FROM ps_crud WHERE id BETWEEN ? AND ? ORDER BY id", [
-          first,
-          last,
-        ]))
+        for (final row in await tx.execute(
+            "SELECT id,tx_id,data FROM ps_crud WHERE id BETWEEN ? AND ? ORDER BY id",
+            [
+              first,
+              last,
+            ]))
           Map<String, Object?>.from(row),
       ];
     }
     if (rows.length != entries.length) return null;
     for (var i = 0; i < entries.length; i++) {
-      if (rows[i]["id"] != entries[i].clientId || rows[i]["tx_id"] != entries[i].transactionId) return null;
+      if (rows[i]["id"] != entries[i].clientId ||
+          rows[i]["tx_id"] != entries[i].transactionId) return null;
     }
     final List<Map<String, Object?>> earliest;
     if (tx == null) {
       earliest = [
-        for (final row in await database.getAll("SELECT id FROM ps_crud ORDER BY id LIMIT 1"))
+        for (final row in await database
+            .getAll("SELECT id FROM ps_crud ORDER BY id LIMIT 1"))
           Map<String, Object?>.from(row),
       ];
     } else {
       earliest = [
-        for (final row in await tx.execute("SELECT id FROM ps_crud ORDER BY id LIMIT 1"))
+        for (final row
+            in await tx.execute("SELECT id FROM ps_crud ORDER BY id LIMIT 1"))
           Map<String, Object?>.from(row),
       ];
     }
     if (earliest.isEmpty || earliest.first["id"] != first) return null;
     final raw = jsonEncode([
-      for (final row in rows) {"id": row["id"], "tx_id": row["tx_id"], "data": row["data"]},
+      for (final row in rows)
+        {"id": row["id"], "tx_id": row["tx_id"], "data": row["data"]},
     ]);
     return utf8.encode(raw).length <= _maxHeadBytes ? raw : null;
   }
@@ -481,7 +589,9 @@ final class AmobiUploadJournal {
       final first = (decoded.first as Map)["id"];
       final last = (decoded.last as Map)["id"];
       if (first is! int || last is! int || first > last) return false;
-      final rows = await database.getAll("SELECT id FROM ps_crud WHERE id BETWEEN ? AND ? LIMIT 1", [first, last]);
+      final rows = await database.getAll(
+          "SELECT id FROM ps_crud WHERE id BETWEEN ? AND ? LIMIT 1",
+          [first, last]);
       return rows.isEmpty;
     } on FormatException {
       return false;
@@ -497,16 +607,19 @@ final class AmobiUploadJournal {
     }
   }
 
-  bool _validAcknowledgement(http.Response response, String key, int entryCount, List<int> requestBody) {
+  bool _validAcknowledgement(http.Response response, String key, int entryCount,
+      List<int> requestBody) {
     if (response.statusCode != 200 ||
         response.bodyBytes.length > 64 * 1024 ||
         _header(response, "idempotency-key") != key ||
-        _header(response, "x-amobi-upload-protocol") != amobiUploadProtocol) {
+        _header(response, "x-amobi-upload-protocol") != protocol) {
       return false;
     }
     try {
       final body = jsonDecode(response.body);
-      if (body is! Map<String, dynamic> || body.length != 3 || body["ok"] != true) return false;
+      if (body is! Map<String, dynamic> ||
+          body.length != 3 ||
+          body["ok"] != true) return false;
       final applied = body["applied"];
       final skipped = body["skipped"];
       final expectedSkipped = _expectedLocalSkips(requestBody, entryCount);
@@ -525,7 +638,8 @@ final class AmobiUploadJournal {
   int? _expectedLocalSkips(List<int> requestBody, int entryCount) {
     try {
       final decoded = jsonDecode(utf8.decode(requestBody));
-      if (decoded is! Map<String, dynamic> || decoded["batch"] is! List) return null;
+      if (decoded is! Map<String, dynamic> || decoded["batch"] is! List)
+        return null;
       final batch = decoded["batch"] as List;
       if (batch.length != entryCount) return null;
       var skipped = 0;
@@ -553,7 +667,9 @@ final class AmobiUploadJournal {
   }
 
   String? _header(http.Response response, String name) {
-    final matching = response.headers.entries.where((entry) => entry.key.toLowerCase() == name).toList();
+    final matching = response.headers.entries
+        .where((entry) => entry.key.toLowerCase() == name)
+        .toList();
     return matching.length == 1 ? matching.single.value : null;
   }
 }

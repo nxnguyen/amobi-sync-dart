@@ -43,6 +43,14 @@ uploads after rollback. An older client must remain offline while pending
 outcomes are reconciled; new writes made by an upstream client after the fork's
 state marker exists cannot be distinguished from fork writes by this journal.
 
+EzAI New and Legacy currently pin GitHub commit
+`b09d418b1b780282bc28e92aaad20c82e1f99257` on branch
+`ezai-local-attachment-skip-20261030`, with package version
+`1.18.0+amobi.4`. This revision validates server receipts for local-only
+attachment `SKIP` entries before completing the SDK queue. The `.3` tag above
+remains the last published version tag; the app dependency pins use the exact
+`.4` commit SHA.
+
 `test/amobi_upload_journal_chunk_test.dart` uses a minimal SDK schema with the
 EzAI chat/history table names and only the columns exercised by its SQLite
 transactions. The separate EzAI New repository test uses the actual app schema
@@ -61,3 +69,17 @@ frozen pending key/body remains unchanged if a later row cannot fit. Already
 partially accepted `.2` heads with an oversized row still require reconciliation;
 this change does not infer a rollback of remote writes. Ten real SDK SQLite
 regressions, including both oversize paths and the raw-head bound, pass.
+
+The `.4` package's focused `flutter test
+test/amobi_upload_journal_chunk_test.dart --no-pub` run passed **12/12** on
+2026-10-30 using PowerSync SQLite core 0.4.11. This includes local-only
+attachment ACK validation, durable chunk continuation after a stale owner
+fence, oversized-head holds before HTTP, reopen/retry, migration of frozen
+`.1` requests, and the 103-entry EzAI delete transaction.
+
+The `.5` package adds project-scoped Amobi upload journals. Protocol names
+select separate durable queue tables and idempotency-key prefixes; existing
+EzAI callers retain their default protocol and limits. Apps can set lower batch
+and body limits to match their Amobi Sync endpoint. The focused journal suite
+passed **16/16**, including EzMath namespace isolation, 50-operation chunking,
+body limits, mismatched ACK holds, and all prior EzAI recovery cases.
