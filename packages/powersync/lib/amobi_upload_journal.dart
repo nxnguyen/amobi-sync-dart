@@ -249,8 +249,15 @@ final class AmobiUploadJournal {
     List<({List<int> bytes, int count})>? plannedRemaining;
     current();
     if (pending == null && transaction == null) {
-      if (legacyHeld)
-        throw const AmobiUploadHeldException(AmobiUploadHoldReason.legacyQueue);
+      if (legacyHeld) {
+        if (!adoptLegacyQueue) {
+          throw const AmobiUploadHeldException(
+              AmobiUploadHoldReason.legacyQueue);
+        }
+        current();
+        await _releaseLegacyQueue();
+        current();
+      }
       return false;
     }
 

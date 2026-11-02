@@ -878,6 +878,51 @@ void main() {
     }
   });
 
+  test('explicit Amobi v2 adoption clears an empty legacy hold without HTTP',
+      () async {
+    final dir =
+        await Directory.systemTemp.createTemp('ezai-empty-legacy-hold-');
+    final file = '${dir.path}/owner.db';
+    try {
+      await _withDb(file, (db) async {
+        await AmobiUploadJournal.initialize(db);
+        await db.execute(
+          'UPDATE amobi_ezai_upload_journal_state SET legacy_held=1 WHERE singleton=1',
+        );
+      });
+
+      await _withDb(file, (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        expect(journal.legacyHeld, isTrue);
+        var calls = 0;
+        expect(
+          await journal.upload(
+            uid: 'owner-a',
+            buildBody: (_) => fail('an empty queue must not build a body'),
+            transport: (key, body) async {
+              calls++;
+              return _ack('unused', 0);
+            },
+            isCurrent: () => true,
+            adoptLegacyQueue: true,
+          ),
+          isFalse,
+        );
+        expect(calls, 0);
+        expect(journal.legacyHeld, isFalse);
+        expect(
+          await db.get(
+            'SELECT legacy_held FROM amobi_ezai_upload_journal_state WHERE singleton=1',
+          ),
+          {'legacy_held': 0},
+        );
+        expect(await db.getNextCrudTransaction(), isNull);
+      });
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   test(
       '103 real EzAI deletes in one SDK head resume first lost ACK and finish exact chunks',
       () async {
