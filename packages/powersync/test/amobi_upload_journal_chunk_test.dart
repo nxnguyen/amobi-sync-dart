@@ -16,10 +16,14 @@ const _schema = Schema([
   Table('chat_table_ez_ai_app', [
     Column.text('history_id'),
     Column.text('content'),
-    Column.text('file_data')
+    Column.text('file_data'),
+    Column.text('user_id'),
   ]),
-  Table('stored_files_table',
-      [Column.text('stored_path'), Column.text('original_name')]),
+  Table('stored_files_table', [
+    Column.text('stored_path'),
+    Column.text('original_name'),
+    Column.text('user_id')
+  ]),
 ]);
 
 final String _extension = Platform.environment['POWERSYNC_EXTENSION'] ??
@@ -66,6 +70,28 @@ String _body(List<CrudEntry> entries) => jsonEncode({
             'table': entry.table,
             'data': {...?entry.opData, 'id': entry.id, 'user_id': 'owner-a'},
           }
+      ]
+    });
+
+String _legacyQueueAdoptionBody(List<CrudEntry> entries) => jsonEncode({
+      'batch': [
+        for (final entry in entries)
+          if (entry.table == 'stored_files_table')
+            {
+              'op': 'SKIP',
+              'table': entry.table,
+              'data': {'id': entry.id, 'user_id': 'owner-a'},
+            }
+          else
+            {
+              'op': switch (entry.op) {
+                UpdateType.put => 'PUT',
+                UpdateType.patch => 'PATCH',
+                UpdateType.delete => 'DELETE'
+              },
+              'table': entry.table,
+              'data': {...?entry.opData, 'id': entry.id, 'user_id': 'owner-a'},
+            }
       ]
     });
 
@@ -748,6 +774,111 @@ void main() {
     }
   });
   test(
+      'explicit Amobi v2 adoption replays an old queue with local files skipped',
+      () async {
+    final dir =
+        await Directory.systemTemp.createTemp('ezai-legacy-queue-adoption-');
+    final file = '${dir.path}/owner.db';
+    String? firstKey;
+    String? firstBody;
+    try {
+      await _withDb(file, (db) async {
+        await db.writeTransaction((tx) async {
+          await tx.execute(
+            'INSERT INTO chat_table_ez_ai_app(id,history_id,content,file_data,user_id) VALUES(?,?,?,?,?)',
+            [
+              'message-1',
+              'session',
+              'Describe this',
+              'data:image/png;base64,AA==',
+              'owner-a'
+            ],
+          );
+          await tx.execute(
+            'INSERT INTO stored_files_table(id,stored_path,original_name,user_id) VALUES(?,?,?,?)',
+            [
+              'file-1',
+              '/private/device/Documents/stored_files/file-1.png',
+              'file-1.png',
+              'owner-a'
+            ],
+          );
+        });
+        final journal = await AmobiUploadJournal.initialize(db);
+        await expectLater(
+          _upload(journal, (key, body) async => _ack(key, 2)),
+          throwsA(isA<AmobiUploadHeldException>()),
+        );
+
+        await expectLater(
+          journal.upload(
+            uid: 'owner-a',
+            buildBody: _legacyQueueAdoptionBody,
+            adoptLegacyQueue: true,
+            transport: (key, body) async {
+              firstKey = key;
+              firstBody = body;
+              throw const AmobiUploadTransportException();
+            },
+            isCurrent: () => true,
+          ),
+          throwsA(isA<AmobiUploadTransportException>()),
+        );
+        expect(await db.getAll('SELECT id FROM ps_crud'), hasLength(2));
+      });
+
+      await _withDb(file, (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        final pendingBefore = await db.get(
+          'SELECT upload_key,body,outcome FROM amobi_ezai_upload_journal_pending WHERE singleton=1',
+        );
+        expect(pendingBefore['upload_key'], firstKey);
+        expect(utf8.decode(pendingBefore['body'] as List<int>), firstBody);
+        expect(pendingBefore['outcome'], 0);
+        expect(
+          await journal.upload(
+            uid: 'owner-a',
+            buildBody: _legacyQueueAdoptionBody,
+            adoptLegacyQueue: true,
+            transport: (key, body) async {
+              expect(key, firstKey);
+              expect(body, firstBody);
+              final batch = (jsonDecode(body)['batch'] as List)
+                  .cast<Map<String, dynamic>>();
+              expect(batch, hasLength(2));
+              expect(batch.first['data']['file_data'],
+                  'data:image/png;base64,AA==');
+              expect(batch.last['op'], 'SKIP');
+              expect(
+                  batch.last['data'], {'id': 'file-1', 'user_id': 'owner-a'});
+              expect(body, isNot(contains('/private/device/')));
+              return _ack(key, 1, skipped: 1);
+            },
+            isCurrent: () => true,
+          ),
+          isTrue,
+        );
+        expect(await db.getAll('SELECT id FROM ps_crud'), isEmpty);
+        expect(
+            await db.getAll('SELECT * FROM amobi_ezai_upload_journal_pending'),
+            isEmpty);
+        expect(
+          await db.get(
+              'SELECT legacy_held FROM amobi_ezai_upload_journal_state WHERE singleton=1'),
+          {'legacy_held': 0},
+        );
+        expect(
+          await db.get('SELECT stored_path FROM stored_files_table WHERE id=?',
+              ['file-1']),
+          {'stored_path': '/private/device/Documents/stored_files/file-1.png'},
+        );
+      });
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test(
       '103 real EzAI deletes in one SDK head resume first lost ACK and finish exact chunks',
       () async {
     final dir = await Directory.systemTemp.createTemp('ezai-chunk-journal-');
@@ -793,6 +924,88 @@ void main() {
         ];
         expect(ids.toSet(), hasLength(103));
         expect(await db.getAll('SELECT id FROM ps_crud'), isEmpty);
+      });
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test(
+      'server commit with lost ACK reopens with same key and body and clears queue once',
+      () async {
+    final dir =
+        await Directory.systemTemp.createTemp('ezai-committed-lost-ack-');
+    final file = '${dir.path}/owner.db';
+    try {
+      final committedByKey = <String, (String body, http.Response ack)>{};
+      var appliedRows = 0;
+      var attempts = 0;
+
+      Future<http.Response> fakeServer(String key, String body) async {
+        attempts++;
+        final previous = committedByKey[key];
+        if (previous != null) {
+          expect(body, previous.$1,
+              reason: 'an idempotency key cannot be reused with a new body');
+          return previous.$2;
+        }
+
+        final count = (jsonDecode(body)['batch'] as List).length;
+        appliedRows += count;
+        final ack = _ack(key, count);
+        committedByKey[key] = (body, ack);
+        throw const SocketException('ACK lost after fake server commit');
+      }
+
+      late String committedKey;
+      late String committedBody;
+      await _withDb(file, (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        await db.execute(
+            'INSERT INTO chat_table_ez_ai_app(id,history_id,content) VALUES(?,?,?)',
+            ['committed-message', 'session', 'one committed mutation']);
+
+        await expectLater(
+          _upload(journal, (key, body) async {
+            committedKey = key;
+            committedBody = body;
+            return fakeServer(key, body);
+          }),
+          throwsA(isA<AmobiUploadTransportException>()),
+        );
+        expect(committedByKey, hasLength(1));
+        expect(appliedRows, 1);
+        expect(await db.getAll('SELECT id FROM ps_crud'), hasLength(1));
+        final pending = await db.get(
+            'SELECT upload_key,body,outcome FROM amobi_ezai_upload_journal_pending');
+        expect(pending['upload_key'], committedKey);
+        expect(utf8.decode(pending['body'] as List<int>), committedBody);
+        expect(pending['outcome'], 0);
+      });
+
+      await _withDb(file, (db) async {
+        final journal = await AmobiUploadJournal.initialize(db);
+        final pending = await db.get(
+            'SELECT upload_key,body,outcome FROM amobi_ezai_upload_journal_pending');
+        expect(pending['upload_key'], committedKey);
+        expect(utf8.decode(pending['body'] as List<int>), committedBody);
+        expect(pending['outcome'], 0);
+
+        expect(await _upload(journal, fakeServer), isTrue);
+        expect(attempts, 2);
+        expect(appliedRows, 1,
+            reason: 'replay must return the cached ACK without reapplying');
+        expect(committedByKey, hasLength(1));
+        expect(await db.getAll('SELECT id FROM ps_crud'), isEmpty);
+        expect(
+            await db.getAll(
+                'SELECT singleton FROM amobi_ezai_upload_journal_pending'),
+            isEmpty);
+        expect(await _upload(journal, fakeServer), isFalse);
+        expect(attempts, 2,
+            reason:
+                'a cleared queue must not send or apply the mutation again');
+        expect(appliedRows, 1);
       });
     } finally {
       await dir.delete(recursive: true);

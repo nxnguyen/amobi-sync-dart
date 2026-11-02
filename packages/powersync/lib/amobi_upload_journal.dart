@@ -55,7 +55,8 @@ class AmobiUploadSessionChangedException implements Exception {
 }
 
 /// A single durable outbox head for a PowerSync database file. Initialize before
-/// any app or migration writes. Existing unmarked queues are permanently held.
+/// any app or migration writes. Existing unmarked queues stay held until an
+/// Amobi v2-authorized caller explicitly adopts them.
 final class AmobiUploadJournal {
   AmobiUploadJournal._(
     this.database,
@@ -71,7 +72,7 @@ final class AmobiUploadJournal {
 
   final PowerSyncDatabase database;
   final String _path;
-  final bool legacyHeld;
+  bool legacyHeld;
   final String protocol;
   final String _stateTable;
   final String _pendingTable;
@@ -195,6 +196,7 @@ final class AmobiUploadJournal {
     required String Function(List<CrudEntry>) buildBody,
     required Future<http.Response> Function(String key, String body) transport,
     required bool Function() isCurrent,
+    bool adoptLegacyQueue = false,
   }) =>
       _serialize(
         () => _upload(
@@ -202,6 +204,7 @@ final class AmobiUploadJournal {
           buildBody: buildBody,
           transport: transport,
           isCurrent: isCurrent,
+          adoptLegacyQueue: adoptLegacyQueue,
         ),
       );
 
@@ -223,13 +226,14 @@ final class AmobiUploadJournal {
     required String Function(List<CrudEntry>) buildBody,
     required Future<http.Response> Function(String key, String body) transport,
     required bool Function() isCurrent,
+    required bool adoptLegacyQueue,
   }) async {
     void current() {
       if (!isCurrent()) throw const AmobiUploadSessionChangedException();
     }
 
     current();
-    if (legacyHeld)
+    if (legacyHeld && !adoptLegacyQueue)
       throw const AmobiUploadHeldException(AmobiUploadHoldReason.legacyQueue);
     final clientId = await database.getClientId();
     if (uid.isEmpty ||
@@ -244,7 +248,11 @@ final class AmobiUploadJournal {
     var transaction = await database.getNextCrudTransaction();
     List<({List<int> bytes, int count})>? plannedRemaining;
     current();
-    if (pending == null && transaction == null) return false;
+    if (pending == null && transaction == null) {
+      if (legacyHeld)
+        throw const AmobiUploadHeldException(AmobiUploadHoldReason.legacyQueue);
+      return false;
+    }
 
     if (pending == null) {
       if (transaction == null)
@@ -338,6 +346,9 @@ final class AmobiUploadJournal {
         );
         current();
       }
+      if (legacyHeld && adoptLegacyQueue) {
+        await _releaseLegacyQueue();
+      }
       if (await _rawHead(transaction) != active.rawHead) {
         throw const AmobiUploadHeldException(AmobiUploadHoldReason.headChanged);
       }
@@ -387,6 +398,19 @@ final class AmobiUploadJournal {
       active = nextPending;
     }
     throw const AmobiUploadHeldException(AmobiUploadHoldReason.capacity);
+  }
+
+  Future<void> _releaseLegacyQueue() async {
+    await database.execute(
+      "UPDATE $_stateTable SET legacy_held=0 WHERE singleton=1 AND legacy_held=1",
+    );
+    final state = await database.get(
+      "SELECT legacy_held FROM $_stateTable WHERE singleton=1",
+    );
+    if (state["legacy_held"] != 0) {
+      throw const AmobiUploadHeldException(AmobiUploadHoldReason.invalidState);
+    }
+    legacyHeld = false;
   }
 
   Future<_Pending?> _pending() async {
