@@ -1,7 +1,7 @@
 import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:amobi_sync_core/src/sync/bucket_storage.dart';
 import 'package:amobi_sync_core/src/sync/protocol.dart';
-import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite3/common.dart';
 import 'package:test/test.dart';
 
 import '../utils/abstract_test_utils.dart';
@@ -472,7 +472,7 @@ void main() {
       await testUtils.cleanDb(path: path);
 
       powersync = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: const Schema([]));
       await powersync.initialize();
       bucketStorage = BucketStorage(powersync);
@@ -498,7 +498,7 @@ void main() {
 
       // Now open another instance with new schema
       powersync = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: defaultSchema);
       await expectAsset1_3();
     });
@@ -521,7 +521,7 @@ void main() {
 
       // Now open another instance with new schema
       powersync = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: const Schema([]));
 
       await expectLater(
@@ -533,7 +533,7 @@ void main() {
 
       // Add schema again
       powersync = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: schema);
       await expectAsset1_3();
     });

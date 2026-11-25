@@ -1,14 +1,11 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:amobi_sync_flutter/amobi_upload_journal.dart';
 import 'package:amobi_sync_flutter/powersync.dart';
+import 'package:amobi_sync_flutter/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:sqlite3/open.dart' as sqlite_open;
-import 'package:sqlite3/sqlite3.dart';
-import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
 const _schema = Schema([
@@ -26,30 +23,14 @@ const _schema = Schema([
   ]),
 ]);
 
-final String _extension = Platform.environment['POWERSYNC_EXTENSION'] ??
-    File('../dart/.native/libpowersync.dylib').absolute.path;
-
-class _HostFactory extends PowerSyncOpenFactory {
-  _HostFactory(String path) : super(path: path);
-  @override
-  CommonDatabase open(SqliteOpenOptions options) {
-    sqlite_open.open.overrideFor(
-        sqlite_open.OperatingSystem.macOS,
-        () => DynamicLibrary.open(
-            '/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib'));
-    return super.open(options);
-  }
-
-  @override
-  void enableExtension() =>
-      sqlite3.ensureExtensionLoaded(SqliteExtension.inLibrary(
-          DynamicLibrary.open(_extension), 'sqlite3_powersync_init'));
+base class _HostFactory extends NativePowerSyncOpenFactory {
+  _HostFactory(String path)
+      : super(path: path, sqliteOptions: const SqliteOptions(maxReaders: 1));
 }
 
 Future<T> _withDb<T>(
     String file, Future<T> Function(PowerSyncDatabase) action) async {
-  final db = PowerSyncDatabase.withFactory(_HostFactory(file),
-      schema: _schema, maxReaders: 1);
+  final db = PowerSyncDatabase.withFactory(_HostFactory(file), schema: _schema);
   try {
     await db.initialize();
     return await action(db);

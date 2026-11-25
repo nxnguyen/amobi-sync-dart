@@ -21,7 +21,7 @@ import 'package:amobi_sync_core/src/sync/sync_status.dart';
 import '../sync/stream.dart';
 import '../sync/streaming_sync.dart';
 
-mixin PowerSyncDatabaseMixin implements SqliteConnection {
+mixin PowerSyncDatabaseMixin on SqliteConnection {
   /// Schema used for the local database.
   Schema get schema;
 
@@ -104,7 +104,8 @@ mixin PowerSyncDatabaseMixin implements SqliteConnection {
 
     await database.initialize();
     await _checkVersion();
-    await database.execute('SELECT powersync_init()');
+    await database
+        .writeTransaction((tx) => tx.execute('SELECT powersync_init()'));
     await updateSchema(schema);
     await _connections.resolveOfflineSyncStatus();
   }
@@ -119,7 +120,9 @@ mixin PowerSyncDatabaseMixin implements SqliteConnection {
       version = row['version'] as String;
     } catch (e) {
       throw SqliteException(
-          1, 'The powersync extension is not loaded correctly. Details: $e');
+          extendedResultCode: 1,
+          message:
+              'The powersync extension is not loaded correctly. Details: $e');
     }
 
     PowerSyncCoreVersion.parse(version).checkSupported();
@@ -283,15 +286,9 @@ mixin PowerSyncDatabaseMixin implements SqliteConnection {
       _connections.checkNotConnected();
 
       this.schema = schema;
-      await database.writeLock((tx) => schema_logic.updateSchema(tx, schema));
+      await database
+          .writeTransaction((tx) => schema_logic.updateSchema(tx, schema));
     });
-  }
-
-  /// A connection factory that can be passed to different isolates.
-  ///
-  /// Use this to access the database in background isolates.
-  IsolateConnectionFactory<CommonDatabase> isolateConnectionFactory() {
-    return database.isolateConnectionFactory();
   }
 
   /// Get an unique id for this client.
@@ -469,9 +466,47 @@ SELECT * FROM crud_entries;
       {String? debugContext, Duration? lockTimeout});
 
   @override
+  Future<T> readTransaction<T>(
+      Future<T> Function(SqliteReadContext tx) callback,
+      {Duration? lockTimeout,
+      String? debugContext}) async {
+    await isInitialized;
+    return database.readTransaction(callback, lockTimeout: lockTimeout);
+  }
+
+  @override
+  Future<T> writeTransaction<T>(
+      Future<T> Function(SqliteWriteContext tx) callback,
+      {Duration? lockTimeout,
+      String? debugContext}) async {
+    await isInitialized;
+    return database.writeTransaction(callback, lockTimeout: lockTimeout);
+  }
+
+  @override
+  Future<T> abortableReadLock<T>(
+      Future<T> Function(SqliteReadContext tx) callback,
+      {Future<void>? abortTrigger,
+      String? debugContext}) async {
+    await isInitialized;
+    return database.abortableReadLock(callback,
+        abortTrigger: abortTrigger, debugContext: debugContext);
+  }
+
+  @override
+  Future<T> abortableWriteLock<T>(
+      Future<T> Function(SqliteWriteContext tx) callback,
+      {Future<void>? abortTrigger,
+      String? debugContext}) async {
+    await isInitialized;
+    return database.abortableWriteLock(callback,
+        abortTrigger: abortTrigger, debugContext: debugContext);
+  }
+
+  @override
   Stream<ResultSet> watch(String sql,
       {List<Object?> parameters = const [],
-      Duration throttle = const Duration(milliseconds: 30),
+      Duration? throttle = const Duration(milliseconds: 30),
       Iterable<String>? triggerOnTables}) {
     if (triggerOnTables == null || triggerOnTables.isEmpty) {
       return database.watch(sql, parameters: parameters, throttle: throttle);

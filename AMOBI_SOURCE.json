@@ -1,15 +1,15 @@
 {
   "repository": "https://github.com/nxnguyen/amobi-sync-dart",
-  "tag": "amobi-1.18.0-core1.8.0.3",
-  "source_snapshot": "872a6062316cec25d23657eac7e4bc34a29c96bd",
+  "tag": "amobi-1.18.0-core1.8.0.9",
+  "source_snapshot": "832f3d1120cd629ea1d4fb218835d29f19510b15",
   "source_path": "clients/flutter_1_18",
   "upstream_repository": "https://github.com/powersync-ja/powersync.dart",
   "upstream_commit": "d915f34a19680c20089b217b1470d275b96260e7",
-  "previous_amobi_commit": "d689cfcb280c25669a3c6cc96cb7a09e635e838b",
+  "previous_amobi_commit": "c566ccbbe2881b13604f218b124fa1a056fc853b",
   "package_path": "packages/powersync",
   "packages": {
-    "flutter": "1.18.0+amobi.3",
-    "core": "1.8.0+amobi.1"
+    "flutter": "1.18.0+amobi.9",
+    "core": "1.8.0+amobi.2"
   },
-  "status": "SDK SQLite tests passed; consumer acceptance recorded in maintained rollout docs"
+  "status": "Native SQLite 3 and sqlite_async 0.14 migration for EzMath."
 }

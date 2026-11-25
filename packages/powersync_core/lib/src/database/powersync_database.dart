@@ -1,7 +1,7 @@
 import 'package:logging/logging.dart';
+import 'package:meta/meta.dart';
 import 'package:amobi_sync_core/src/database/powersync_database_impl.dart';
 import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
-import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
 import '../schema.dart';
@@ -15,9 +15,11 @@ import '../schema.dart';
 ///
 /// All changes to local tables are automatically recorded, whether connected
 /// or not. Once connected, the changes are uploaded.
-abstract class PowerSyncDatabase
-    with SqliteQueries, PowerSyncDatabaseMixin
-    implements SqliteConnection {
+abstract base class PowerSyncDatabase extends SqliteConnection
+    with PowerSyncDatabaseMixin {
+  @protected
+  PowerSyncDatabase.internal();
+
   /// Open a [PowerSyncDatabase].
   ///
   /// Only a single [PowerSyncDatabase] per [path] should be opened at a time.
@@ -29,44 +31,40 @@ abstract class PowerSyncDatabase
   /// do not block read transactions, and read transactions will see the state
   /// from the last committed write transaction.
   ///
-  /// A maximum of [maxReaders] concurrent read transactions are allowed.
+  /// The maximum number of concurrent readers is configured with
+  /// [SqliteOptions.maxReaders].
   ///
   /// [logger] defaults to [autoLogger], which logs to the console in debug builds.
   factory PowerSyncDatabase({
     required Schema schema,
     required String path,
     Logger? logger,
-    @Deprecated("Use [PowerSyncDatabase.withFactory] instead.")
-    // ignore: deprecated_member_use_from_same_package
-    SqliteConnectionSetup? sqliteSetup,
+    SqliteOptions sqliteOptions = const SqliteOptions(),
   }) {
     return PowerSyncDatabaseImpl(
       schema: schema,
       path: path,
       logger: logger,
-      // ignore: deprecated_member_use_from_same_package
-      sqliteSetup: sqliteSetup,
+      sqliteOptions: sqliteOptions,
     );
   }
 
-  /// Open a [PowerSyncDatabase] with a [PowerSyncOpenFactory].
+  /// Open a [PowerSyncDatabase] with a platform-specific [SqliteOpenFactory].
   ///
   /// The factory determines which database file is opened, as well as any
   /// additional logic to run inside the database isolate before or after opening.
   ///
-  /// Subclass [PowerSyncOpenFactory] to add custom logic to this process.
+  /// Subclass the platform-specific native or web factory to customize opening.
   ///
   /// [logger] defaults to [autoLogger], which logs to the console in debug builds.
   factory PowerSyncDatabase.withFactory(
-    DefaultSqliteOpenFactory openFactory, {
+    SqliteOpenFactory openFactory, {
     required Schema schema,
-    int maxReaders = SqliteDatabase.defaultMaxReaders,
     Logger? logger,
   }) {
     return PowerSyncDatabaseImpl.withFactory(
       openFactory,
       schema: schema,
-      maxReaders: maxReaders,
       logger: logger,
     );
   }

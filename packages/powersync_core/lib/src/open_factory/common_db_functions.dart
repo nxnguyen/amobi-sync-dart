@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:sqlite_async/sqlite3_common.dart' as sqlite;
-import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite3/common.dart' as sqlite;
+import 'package:sqlite3/common.dart';
 
 void setupCommonDBFunctions(CommonDatabase db) {
   db.createFunction(

@@ -10,7 +10,7 @@ import 'package:amobi_sync_core/src/exceptions.dart';
 import 'package:amobi_sync_core/src/log_internal.dart';
 import 'package:amobi_sync_core/src/sync/options.dart';
 import 'package:amobi_sync_core/src/user_agent/user_agent.dart';
-import 'package:sqlite_async/mutex.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
 import '../crud.dart';
 import 'bucket_storage.dart';
@@ -83,8 +83,8 @@ class StreamingSyncImplementation implements StreamingSync {
     /// A good value is typically the DB file path which it will mutate when syncing.
     String? identifier = "unknown",
   })  : _client = client,
-        syncMutex = syncMutex ?? Mutex(identifier: "sync-$identifier"),
-        crudMutex = crudMutex ?? Mutex(identifier: "crud-$identifier"),
+        syncMutex = syncMutex ?? Mutex.simple(),
+        crudMutex = crudMutex ?? Mutex.simple(),
         _userAgentHeaders = userAgentHeaders(),
         logger = logger ?? isolateLogger,
         _activeSubscriptions = activeSubscriptions;
@@ -165,7 +165,7 @@ class StreamingSyncImplementation implements StreamingSync {
               case SyncClientImplementation.rust:
                 return _rustStreamingSyncIteration();
             }
-          }, timeout: _retryDelay);
+          }, abortTrigger: Future<void>.delayed(_retryDelay));
         } catch (e, stacktrace) {
           if (aborted && e is http.ClientException) {
             // Explicit abort requested - ignore. Example error:
@@ -259,7 +259,7 @@ class StreamingSyncImplementation implements StreamingSync {
           _state.updateStatus((s) => s.uploading = false);
         }
       }
-    }, timeout: _retryDelay).whenComplete(() {
+    }, abortTrigger: Future<void>.delayed(_retryDelay)).whenComplete(() {
       if (!aborted) {
         _nonLineSyncEvents.add(const UploadCompleted());
       }

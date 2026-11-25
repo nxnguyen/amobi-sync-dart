@@ -13,7 +13,6 @@ import 'package:http/browser_client.dart';
 import 'package:logging/logging.dart';
 import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:amobi_sync_core/sqlite_async.dart';
-import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
 import 'package:amobi_sync_core/src/sync/internal_connector.dart';
 import 'package:amobi_sync_core/src/sync/options.dart';
 import 'package:amobi_sync_core/src/sync/streaming_sync.dart';
@@ -299,17 +298,13 @@ class _SyncRunner {
     });
 
     final tables = ['ps_crud'];
-    Stream<UpdateNotification> crudStream =
-        powerSyncUpdateNotifications(Stream.empty());
-    if (database.updates != null) {
-      final filteredStream = database.updates!
-          .transform(UpdateNotification.filterTablesTransformer(tables));
-      crudStream = UpdateNotification.throttleStream(
-        filteredStream,
-        options.crudThrottleTime,
-        addOne: UpdateNotification.empty(),
-      );
-    }
+    final filteredStream = database.updates
+        .transform(UpdateNotification.filterTablesTransformer(tables));
+    final crudStream = UpdateNotification.throttleStream(
+      filteredStream,
+      options.crudThrottleTime,
+      addOne: UpdateNotification.empty(),
+    );
 
     currentStreams = connections.values.flattenedToSet.toList();
     sync = StreamingSyncImplementation(

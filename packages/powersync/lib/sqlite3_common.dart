@@ -2,4 +2,4 @@
 /// adding it as a direct dependency.
 library;
 
-export 'package:amobi_sync_core/sqlite3_common.dart';
+export 'package:sqlite3/common.dart';

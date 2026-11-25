@@ -17,24 +17,20 @@ final class ActiveDatabaseGroup {
   int refCount = 0;
 
   /// Use to prevent multiple connections from being opened concurrently
-  final Mutex syncConnectMutex = Mutex();
+  final Mutex syncConnectMutex = Mutex.simple();
   final Mutex syncMutex;
   final Mutex crudMutex;
 
   final String identifier;
 
   ActiveDatabaseGroup._(this.identifier)
-      : syncMutex = Mutex(identifier: '$identifier-sync'),
-        crudMutex = Mutex(identifier: '$identifier-crud');
+      : syncMutex = Mutex.simple(),
+        crudMutex = Mutex.simple();
 
   Future<void> close() async {
     if (--refCount == 0) {
       final removedGroup = _activeGroups.remove(identifier);
       assert(removedGroup == this);
-
-      await syncConnectMutex.close();
-      await syncMutex.close();
-      await crudMutex.close();
     }
   }
 

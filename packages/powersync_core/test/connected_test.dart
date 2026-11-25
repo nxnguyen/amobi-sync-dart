@@ -6,6 +6,7 @@ library;
 import 'dart:async';
 
 import 'package:amobi_sync_core/powersync_core.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 import 'package:test/test.dart';
 
 import 'server/sync_server/mock_sync_server.dart';
@@ -42,9 +43,11 @@ void main() {
       });
 
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
-          schema: defaultSchema,
-          maxReaders: 3);
+        (await testUtils.testFactory(
+                path: path, options: const SqliteOptions(maxReaders: 3)))
+            .sqliteFactory,
+        schema: defaultSchema,
+      );
       addTearDown(() => {db.close()});
       await db.initialize();
 
@@ -82,9 +85,11 @@ void main() {
       });
 
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
-          schema: defaultSchema,
-          maxReaders: 3);
+        (await testUtils.testFactory(
+                path: path, options: const SqliteOptions(maxReaders: 3)))
+            .sqliteFactory,
+        schema: defaultSchema,
+      );
       // Shorter retry delay, to speed up tests
       // ignore: deprecated_member_use_from_same_package
       db.retryDelay = Duration(milliseconds: 10);
@@ -147,9 +152,11 @@ void main() {
       });
 
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
-          schema: defaultSchema,
-          maxReaders: 3);
+        (await testUtils.testFactory(
+                path: path, options: const SqliteOptions(maxReaders: 3)))
+            .sqliteFactory,
+        schema: defaultSchema,
+      );
       addTearDown(() => {db.close()});
       await db.initialize();
 
@@ -203,9 +210,11 @@ void main() {
       });
 
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
-          schema: defaultSchema,
-          maxReaders: 3);
+        (await testUtils.testFactory(
+                path: path, options: const SqliteOptions(maxReaders: 3)))
+            .sqliteFactory,
+        schema: defaultSchema,
+      );
       addTearDown(() => {db.close()});
       await db.initialize();
 

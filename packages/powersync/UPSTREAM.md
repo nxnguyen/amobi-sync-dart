@@ -12,13 +12,23 @@ Upstream repository: https://github.com/powersync-ja/powersync.dart
 
 Maintained Amobi repository:
 `https://github.com/nxnguyen/amobi-sync-dart`, tag
-`amobi-1.18.0-core1.8.0.3`. The exact commit is recorded in
+`amobi-1.18.0-core1.8.0.8`. The exact commit is recorded in
 `clients/GITHUB_FORKS.json` in the maintained server repository.
 Git package paths are `packages/powersync` and `packages/powersync_core`;
 the maintained local mirrors remain `clients/flutter_1_18` and its `core/`.
 Package repository metadata points here; upstream attribution stays above.
 
-Dart runtime/test sources differ only in package namespace references. `bin/setup_web.dart` retains the upstream CLI, with core asset selection recognizing `amobi_sync_flutter` and stripping fork build metadata to select the upstream 1.18.0 assets. The native plugin stays at 0.4.15+1. Protocol, schema, queue, checkpoint, and migration code are unchanged. Upstream LICENSE and NOTICE are retained in both package roots.
+The original 1.18.0 snapshot renamed package namespaces and taught
+`bin/setup_web.dart` to select the upstream assets. It used native plugin
+`0.4.15+1`. Upstream LICENSE and NOTICE are retained in both package roots.
+
+`amobi-1.18.0-core1.8.0.9` pairs Flutter `1.18.0+amobi.9` with Core
+`1.8.0+amobi.2` for native apps using `sqlite3 ^3.9.1` and
+`sqlite_async ^0.14.8`. This revision requires Dart 3.10 or later. Dart build
+hooks bundle the checksum-verified PowerSync core extension from the upstream
+`v0.4.11` release. Native custom database factories should extend
+`NativePowerSyncOpenFactory` from `native.dart` and set reader limits through
+`SqliteOptions`. The web workers are outside the native release verification.
 
 `lib/amobi_upload_journal.dart` and its two path helpers are an additional
 EzAI upload extension. They persist the frozen request and SDK queue head in
@@ -43,13 +53,22 @@ uploads after rollback. An older client must remain offline while pending
 outcomes are reconciled; new writes made by an upstream client after the fork's
 state marker exists cannot be distinguished from fork writes by this journal.
 
-EzAI New and Legacy currently pin GitHub commit
-`b09d418b1b780282bc28e92aaad20c82e1f99257` on branch
-`ezai-local-attachment-skip-20261030`, with package version
-`1.18.0+amobi.4`. This revision validates server receipts for local-only
-attachment `SKIP` entries before completing the SDK queue. The `.3` tag above
-remains the last published version tag; the app dependency pins use the exact
-`.4` commit SHA.
+EzAI New, EzAI Legacy and EzMath previously shared the immutable GitHub revision
+`c566ccbbe2881b13604f218b124fa1a056fc853b`, tag
+`amobi-1.18.0-core1.8.0.8`, with package version `1.18.0+amobi.8`. The `.6`
+release added sibling Core package metadata needed by the GitHub monorepo
+layout. The `.7` release adds opt-in adoption for an old unjournaled or held
+CRUD queue. The caller may enable it only after successful Amobi v2 owner
+credentials; the journal freezes a new idempotency key and request body before
+HTTP, then removes SDK CRUD only after an exact durable ACK. A lost ACK reopens
+with the same key and body. Local stored-file metadata is ACKed as `SKIP`, while
+co-batched chat payload remains in the request. The `.8` fix clears an empty
+legacy-held marker without HTTP after the same explicit v2 authorization,
+allowing download sync to continue for owners with no queued CRUD. The focused
+SDK test passed 19/19 on 2026-11-02. EzAI New and Legacy wire tests passed
+30/30 and 32/32;
+their owner lifecycle suites each passed 38/38. No app release was built or
+published.
 
 `test/amobi_upload_journal_chunk_test.dart` uses a minimal SDK schema with the
 EzAI chat/history table names and only the columns exercised by its SQLite
@@ -83,3 +102,7 @@ EzAI callers retain their default protocol and limits. Apps can set lower batch
 and body limits to match their Amobi Sync endpoint. The focused journal suite
 passed **16/16**, including EzMath namespace isolation, 50-operation chunking,
 body limits, mismatched ACK holds, and all prior EzAI recovery cases.
+
+The `.6` GitHub package metadata points `amobi_sync_core` at the sibling
+`packages/powersync_core` directory in the published monorepo. The local
+maintained checkout keeps its `core` path because its workspace layout differs.

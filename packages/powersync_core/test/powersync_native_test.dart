@@ -2,10 +2,10 @@
 library;
 
 import 'dart:async';
-import 'dart:math';
 
 import 'package:amobi_sync_core/powersync_core.dart';
-import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite3/common.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 import 'package:test/test.dart';
 import 'utils/abstract_test_utils.dart';
 import 'utils/test_utils_impl.dart';
@@ -43,21 +43,33 @@ void main() {
           ]));
     });
 
+    test('PowerSync extension exposes UUID and diff functions', () async {
+      final db = await testUtils.setupPowerSync(path: path);
+      final row = await db.get(
+        'SELECT uuid() AS id, powersync_diff(?, ?) AS diff',
+        ['{"a":1}', '{"a":2,"b":3}'],
+      );
+      expect(row['id'], isA<String>());
+      expect(row['diff'], '{"a":2,"b":3}');
+      final bucketColumns = await db.getAll('PRAGMA table_info(ps_buckets)');
+      expect(
+          bucketColumns.map((column) => column['name']), contains('target_op'));
+    });
+
     // Manual test
     test('Concurrency', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
-          schema: defaultSchema,
-          maxReaders: 3);
+        (await testUtils.testFactory(
+                path: path, options: const SqliteOptions(maxReaders: 3)))
+            .sqliteFactory,
+        schema: defaultSchema,
+      );
       await db.initialize();
 
-      print("${DateTime.now()} start");
-      var futures = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => db.get(
-          'SELECT ? as i, powersync_sleep(?) as sleep, powersync_connection_name() as connection',
-          [i, 5 + Random().nextInt(10)]));
-      await for (var result in Stream.fromFutures(futures)) {
-        print("${DateTime.now()} $result");
-      }
+      final futures = [
+        for (var i = 1; i <= 11; i++) db.get('SELECT ? as i', [i]),
+      ];
+      expect(await Future.wait(futures), hasLength(11));
     });
 
     test('read-only transactions', () async {
@@ -72,8 +84,7 @@ void main() {
       },
           throwsA((dynamic e) =>
               e is SqliteException &&
-              e.message
-                  .contains('attempt to write in a read-only transaction')));
+              e.message.contains('attempt to write a readonly database')));
 
       // Can use WITH ... SELECT
       await db.getAll("WITH test AS (SELECT 1 AS one) SELECT * FROM test");
@@ -85,8 +96,7 @@ void main() {
       },
           throwsA((dynamic e) =>
               e is SqliteException &&
-              e.message
-                  .contains('attempt to write in a read-only transaction')));
+              e.message.contains('attempt to write a readonly database')));
 
       await db.writeTransaction((tx) async {
         // Within a write transaction, this is fine

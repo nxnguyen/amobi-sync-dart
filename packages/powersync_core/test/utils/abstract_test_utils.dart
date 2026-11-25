@@ -5,12 +5,11 @@ import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 import 'package:amobi_sync_core/powersync_core.dart';
 import 'package:amobi_sync_core/src/abort_controller.dart';
-import 'package:amobi_sync_core/src/database/powersync_db_mixin.dart';
 import 'package:amobi_sync_core/src/sync/bucket_storage.dart';
 import 'package:amobi_sync_core/src/sync/internal_connector.dart';
 import 'package:amobi_sync_core/src/sync/options.dart';
 import 'package:amobi_sync_core/src/sync/streaming_sync.dart';
-import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite3/common.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 import 'package:test/test.dart';
 import 'package:test_api/src/backend/invoker.dart';
@@ -63,7 +62,9 @@ Logger _makeTestLogger({Level level = Level.ALL, String? name}) {
   return logger;
 }
 
-abstract mixin class TestPowerSyncFactory implements PowerSyncOpenFactory {
+abstract mixin class TestPowerSyncFactory {
+  SqliteOpenFactory get sqliteFactory => this as SqliteOpenFactory;
+
   Future<CommonDatabase> openRawInMemoryDatabase();
 
   Future<(CommonDatabase, TestDatabase)> openInMemoryDatabase({
@@ -102,7 +103,7 @@ abstract class AbstractTestUtils {
   Future<TestPowerSyncFactory> testFactory(
       {String? path,
       String sqlitePath = '',
-      SqliteOptions options = const SqliteOptions.defaults()});
+      SqliteOptions options = const SqliteOptions()});
 
   /// Creates a SqliteDatabaseConnection
   Future<PowerSyncDatabase> setupPowerSync({
@@ -111,7 +112,8 @@ abstract class AbstractTestUtils {
     Logger? logger,
     bool initialize = true,
   }) async {
-    final db = PowerSyncDatabase.withFactory(await testFactory(path: path),
+    final factory = await testFactory(path: path);
+    final db = PowerSyncDatabase.withFactory(factory.sqliteFactory,
         schema: schema ?? defaultSchema,
         logger: logger ?? _makeTestLogger(name: _testName));
     if (initialize) {
@@ -119,16 +121,6 @@ abstract class AbstractTestUtils {
     }
     addTearDown(db.close);
     return db;
-  }
-
-  Future<CommonDatabase> setupSqlite(
-      {required PowerSyncDatabase powersync}) async {
-    await powersync.initialize();
-
-    final sqliteDb =
-        await powersync.isolateConnectionFactory().openRawDatabase();
-
-    return sqliteDb;
   }
 
   /// Deletes any DB data
@@ -159,9 +151,7 @@ class TestConnector extends PowerSyncBackendConnector {
 ///
 /// This ensures tests for sync cover the `ConnectionManager` and other methods
 /// exposed by the mixin.
-final class TestDatabase
-    with SqliteQueries, PowerSyncDatabaseMixin
-    implements PowerSyncDatabase {
+final class TestDatabase extends PowerSyncDatabase {
   @override
   final SqliteDatabase database;
   @override
@@ -178,9 +168,52 @@ final class TestDatabase
     required this.database,
     required this.logger,
     required this.schema,
-  }) {
+  }) : super.internal() {
     isInitialized = baseInit();
   }
+
+  @override
+  Future<ResultSet> execute(String sql,
+          [List<Object?> parameters = const []]) =>
+      database.execute(sql, parameters);
+
+  @override
+  Future<void> executeBatch(String sql, List<List<Object?>> parameterSets) =>
+      database.executeBatch(sql, parameterSets);
+
+  @override
+  Future<void> executeMultiple(String sql) => database.executeMultiple(sql);
+
+  @override
+  Future<Row> get(String sql, [List<Object?> parameters = const []]) =>
+      database.get(sql, parameters);
+
+  @override
+  Future<ResultSet> getAll(String sql, [List<Object?> parameters = const []]) =>
+      database.getAll(sql, parameters);
+
+  @override
+  Future<Row?> getOptional(String sql, [List<Object?> parameters = const []]) =>
+      database.getOptional(sql, parameters);
+
+  @override
+  Future<T> computeWithDatabase<T>(
+          Future<T> Function(CommonDatabase db) compute) =>
+      database.computeWithDatabase(compute);
+
+  @override
+  Future<T> readTransaction<T>(
+          Future<T> Function(SqliteReadContext tx) callback,
+          {String? debugContext,
+          Duration? lockTimeout}) =>
+      database.readTransaction(callback, lockTimeout: lockTimeout);
+
+  @override
+  Future<T> writeTransaction<T>(
+          Future<T> Function(SqliteWriteContext tx) callback,
+          {String? debugContext,
+          Duration? lockTimeout}) =>
+      database.writeTransaction(callback, lockTimeout: lockTimeout);
 
   @override
   Future<void> connectInternal({

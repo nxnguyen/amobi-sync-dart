@@ -1,118 +1,58 @@
 import 'dart:ffi';
 import 'dart:io' as io;
-import 'dart:io';
-import 'dart:isolate';
+import 'dart:math';
 
-import 'package:amobi_sync_core/src/exceptions.dart';
-import 'package:amobi_sync_core/src/log.dart';
-import 'package:amobi_sync_core/src/open_factory/abstract_powersync_open_factory.dart';
-import 'package:sqlite_async/sqlite3.dart' as sqlite;
-import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:sqlite_async/native.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
-/// Native implementation for [AbstractPowerSyncOpenFactory]
-class PowerSyncOpenFactory extends AbstractPowerSyncOpenFactory {
-  @Deprecated('Override PowerSyncOpenFactory instead.')
-  final SqliteConnectionSetup? _sqliteSetup;
+import 'sqlite3_powersync_init.dart';
+import '../powersync_sqlite_options.dart';
 
-  PowerSyncOpenFactory({
+var _extensionLoaded = false;
+
+SqliteOpenFactory powerSyncOpenFactory(String path, SqliteOptions options) =>
+    NativePowerSyncOpenFactory(path: path, sqliteOptions: options);
+
+/// Native PowerSync database factory with the PowerSync SQLite extension.
+base class NativePowerSyncOpenFactory extends NativeSqliteOpenFactory {
+  NativePowerSyncOpenFactory({
     required super.path,
-    super.sqliteOptions,
-    @Deprecated('Override PowerSyncOpenFactory instead.')
-    SqliteConnectionSetup? sqliteSetup,
-  })
-  // ignore: deprecated_member_use_from_same_package
-  : _sqliteSetup = sqliteSetup;
+    super.sqliteOptions = powerSyncDefaultSqliteOptions,
+  });
 
-  @override
   void enableExtension() {
-    var powersyncLib = _getDynamicLibraryForPlatform();
-    sqlite.sqlite3.ensureExtensionLoaded(sqlite.SqliteExtension.inLibrary(
-        powersyncLib, 'sqlite3_powersync_init'));
-  }
-
-  /// Returns the dynamic library for the current platform.
-  DynamicLibrary _getDynamicLibraryForPlatform() {
-    /// When running tests, we need to load the library for all platforms.
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      return DynamicLibrary.open(getLibraryForPlatform());
-    }
-    return (Platform.isIOS || Platform.isMacOS)
-        ? DynamicLibrary.process()
-        : DynamicLibrary.open(getLibraryForPlatform());
-  }
-
-  @override
-  setupFunctions(CommonDatabase db) {
-    super.setupFunctions(db);
-    db.createFunction(
-      functionName: 'powersync_sleep',
-      argumentCount: const sqlite.AllowedArgumentCount(1),
-      function: (args) {
-        final millis = args[0] as int;
-        sleep(Duration(milliseconds: millis));
-        return millis;
-      },
+    if (_extensionLoaded) return;
+    final entrypoint = Native.addressOf<NativeFunction<ExtensionEntrypoint>>(
+      sqlite3_powersync_init,
     );
-
-    db.createFunction(
-      functionName: 'powersync_connection_name',
-      argumentCount: const sqlite.AllowedArgumentCount(0),
-      function: (args) {
-        return Isolate.current.debugName;
-      },
+    sqlite.sqlite3.ensureExtensionLoaded(
+      sqlite.SqliteExtension(entrypoint.cast()),
     );
+    _extensionLoaded = true;
   }
 
   @override
-  CommonDatabase open(SqliteOpenOptions options) {
-    // ignore: deprecated_member_use_from_same_package
-    _sqliteSetup?.setup();
+  List<String> pragmaStatements(SqliteOpenOptions options) => [
+        ...super.pragmaStatements(options),
+        'PRAGMA recursive_triggers = TRUE',
+      ];
 
-    try {
-      enableExtension();
-    } on PowersyncNotReadyException catch (e) {
-      autoLogger.severe(e.message);
-      rethrow;
+  @override
+  sqlite.Database openNativeConnection(SqliteOpenOptions options) {
+    enableExtension();
+
+    final stopwatch = Stopwatch()..start();
+    var retryDelay = 2;
+    while (stopwatch.elapsedMilliseconds < 500) {
+      try {
+        return super.openNativeConnection(options);
+      } on sqlite.SqliteException catch (e) {
+        if (e.resultCode != 5) rethrow;
+        io.sleep(Duration(milliseconds: retryDelay));
+        retryDelay = min(retryDelay * 2, 16);
+      }
     }
-
-    var db = super.open(options);
-    db.execute('PRAGMA recursive_triggers = TRUE');
-    return db;
-  }
-
-  @override
-  String getLibraryForPlatform({String? path}) {
-    switch (Abi.current()) {
-      case Abi.androidArm:
-      case Abi.androidArm64:
-      case Abi.androidX64:
-        return 'libpowersync.so';
-      case Abi.macosArm64:
-      case Abi.macosX64:
-        return 'libpowersync.dylib';
-      case Abi.linuxX64:
-        return 'libpowersync_x64.so';
-      case Abi.linuxArm64:
-        return 'libpowersync_aarch64.so';
-      case Abi.windowsX64:
-        return 'powersync_x64.dll';
-      case Abi.androidIA32:
-        throw PowersyncNotReadyException(
-          'Unsupported processor architecture. X86 Android emulators are not '
-          'supported. Please use an x86_64 emulator instead. All physical '
-          'Android devices are supported including 32bit ARM.',
-        );
-      default:
-        throw PowersyncNotReadyException(
-          'Unsupported processor architecture "${Abi.current()}". '
-          'Please open an issue on GitHub to request it.',
-        );
-    }
-  }
-
-  @override
-  void sleep(Duration duration) {
-    io.sleep(duration);
+    throw StateError('Timed out opening PowerSync SQLite connection');
   }
 }

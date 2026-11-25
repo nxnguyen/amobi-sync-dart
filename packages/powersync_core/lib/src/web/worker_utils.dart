@@ -1,8 +1,8 @@
 import 'dart:js_interop';
 
 import 'package:amobi_sync_core/src/open_factory/common_db_functions.dart';
-import 'package:sqlite_async/sqlite3_wasm.dart';
-import 'package:sqlite_async/sqlite3_web.dart';
+import 'package:sqlite3/wasm.dart';
+import 'package:sqlite3_web/sqlite3_web.dart';
 import 'package:sqlite_async/sqlite3_web_worker.dart';
 import 'package:uuid/uuid.dart';
 
@@ -31,7 +31,7 @@ final class PowerSyncAsyncSqliteController extends AsyncSqliteController {
 
   @override
   Future<JSAny?> handleCustomRequest(
-      ClientConnection connection, JSAny? request) {
+      ClientConnection connection, CustomClientRequest request) {
     throw UnimplementedError();
   }
 }

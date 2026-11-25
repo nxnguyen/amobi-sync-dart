@@ -35,7 +35,7 @@ void main() {
     // Manual tests
     test('Insert Performance 1 - direct', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();
@@ -52,7 +52,7 @@ void main() {
 
     test('Insert Performance 2 - writeTransaction', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();
@@ -71,7 +71,7 @@ void main() {
 
     test('Insert Performance 4 - pipelined', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();
@@ -93,7 +93,7 @@ void main() {
 
     test('Insert Performance 5 - executeBatch', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();

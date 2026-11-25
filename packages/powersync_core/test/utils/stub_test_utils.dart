@@ -7,7 +7,7 @@ class TestUtils extends AbstractTestUtils {
   Future<TestPowerSyncFactory> testFactory(
       {String? path,
       String sqlitePath = '',
-      SqliteOptions options = const SqliteOptions.defaults()}) {
+      SqliteOptions options = const SqliteOptions()}) {
     throw UnimplementedError();
   }
 

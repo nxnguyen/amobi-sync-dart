@@ -25,7 +25,7 @@ void main() {
     // Manual tests
     test('Insert Performance 3a - computeWithDatabase', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();
@@ -45,7 +45,7 @@ void main() {
 
     test('Insert Performance 3b - prepared statement', () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       final timer = Stopwatch()..start();
@@ -58,7 +58,7 @@ void main() {
             stmt.execute(['Test User', 'user@example.org']);
           }
         } finally {
-          stmt.dispose();
+          stmt.close();
         }
       });
 
@@ -70,7 +70,7 @@ void main() {
     test('Insert Performance 3c - prepared statement, dart-generated ids',
         () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       // Test to exclude the function overhead time of generating uuids
@@ -85,7 +85,7 @@ void main() {
             stmt.execute([id, 'Test User', 'user@example.org']);
           }
         } finally {
-          stmt.dispose();
+          stmt.close();
         }
       });
 
@@ -96,7 +96,7 @@ void main() {
     test('Insert Performance 3d - prepared statement, pre-generated ids',
         () async {
       final db = PowerSyncDatabase.withFactory(
-          await testUtils.testFactory(path: path),
+          (await testUtils.testFactory(path: path)).sqliteFactory,
           schema: pschema);
       await db.initialize();
       // Test to completely exclude time taken to generate uuids
@@ -110,7 +110,7 @@ void main() {
         for (var id in ids) {
           stmt.execute([id, 'Test User', 'user@example.org']);
         }
-        stmt.dispose();
+        stmt.close();
       });
 
       print("Completed synchronous inserts prepared in ${timer.elapsed}");

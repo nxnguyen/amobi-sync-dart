@@ -3,7 +3,9 @@ import 'dart:js_interop';
 
 import 'package:logging/logging.dart';
 import 'package:amobi_sync_core/powersync_core.dart';
-import 'package:sqlite_async/sqlite3_wasm.dart';
+import 'package:amobi_sync_core/web.dart';
+import 'package:amobi_sync_core/src/web/worker_utils.dart';
+import 'package:sqlite3/wasm.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' show Blob, BlobPropertyBag;
@@ -12,7 +14,8 @@ import 'abstract_test_utils.dart';
 @JS('URL.createObjectURL')
 external String _createObjectURL(Blob blob);
 
-class TestOpenFactory extends PowerSyncOpenFactory with TestPowerSyncFactory {
+base class TestOpenFactory extends PowerSyncWebOpenFactory
+    with TestPowerSyncFactory {
   TestOpenFactory({required super.path, super.sqliteOptions});
 
   @override
@@ -23,14 +26,8 @@ class TestOpenFactory extends PowerSyncOpenFactory with TestPowerSyncFactory {
 
     final db = sqlite.openInMemory();
 
-    try {
-      enableExtension();
-    } on PowersyncNotReadyException catch (e) {
-      autoLogger.severe(e.message);
-      rethrow;
-    }
+    setupPowerSyncDatabase(db);
 
-    setupFunctions(db);
     return db;
   }
 }
@@ -65,10 +62,10 @@ class TestUtils extends AbstractTestUtils {
   Future<TestPowerSyncFactory> testFactory(
       {String? path,
       String sqlitePath = '',
-      SqliteOptions options = const SqliteOptions.defaults()}) async {
+      SqliteOptions options = const SqliteOptions()}) async {
     await _isInitialized;
 
-    final webOptions = SqliteOptions(
+    final webOptions = options.copyWith(
         webSqliteOptions:
             WebSqliteOptions(wasmUri: sqlite3WASMUri, workerUri: workerUri));
     return TestOpenFactory(path: path ?? '', sqliteOptions: webOptions);
@@ -83,12 +80,5 @@ class TestUtils extends AbstractTestUtils {
     await _isInitialized;
     return super.setupPowerSync(
         path: path, schema: schema, logger: logger, initialize: initialize);
-  }
-
-  @override
-  Future<CommonDatabase> setupSqlite(
-      {required PowerSyncDatabase powersync}) async {
-    await _isInitialized;
-    return super.setupSqlite(powersync: powersync);
   }
 }
